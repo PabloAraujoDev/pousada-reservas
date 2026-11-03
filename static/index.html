@@ -1,0 +1,587 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pousada Boa Esperança - Reservas</title>
+<link rel="icon" href="/static/favicon.ico" sizes="16x16 32x32 48x48">
+<link rel="icon" type="image/png" sizes="192x192" href="/static/icon-192.png">
+<link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<header>
+  <div class="marca">
+    <img class="logo" src="/static/logo.png" width="42" height="40" alt="Logo do clube (COPMBM)">
+    <h1>Pousada Boa Esperança</h1>
+  </div>
+  <nav>
+    <button data-aba="mapa" data-cap="reservas.ver" data-menu="mapa" class="ativo oculto">Mapa da reserva</button>
+    <button data-aba="calendario" data-cap="reservas.ver" data-menu="calendario" class="oculto">Calendário</button>
+    <button data-aba="folha" data-cap="folha.ver" data-menu="folha" class="oculto">Folha da semana</button>
+    <button data-aba="buscar" data-cap="reservas.ver" data-menu="buscar" class="oculto">Buscar</button>
+    <button data-aba="governanca" data-cap="governanca.ver" data-menu="governanca" class="oculto">Governança</button>
+    <button data-aba="camareiras" data-cap="camareiras.ver" data-menu="camareiras" class="oculto">Camareiras</button>
+    <button data-aba="canceladas" data-cap="reservas.ver_canceladas" data-menu="canceladas" class="oculto">Canceladas</button>
+    <button data-aba="historico" data-cap="historico.completo,historico.resumo" data-menu="historico" class="oculto">Histórico</button>
+    <button data-aba="usuarios" data-cap="usuarios" data-menu="usuarios" class="oculto">Usuários</button>
+    <button id="btnImpLista" data-cap="importar" data-menu="importar" class="oculto">Importar lista</button>
+    <button class="novo oculto" id="btnNova" data-cap="reservas.criar" data-menu="nova">+ Nova reserva</button>
+    <span class="quem" id="quem"></span>
+    <button id="btnPersonalizar" type="button" class="so-icone" title="Personalizar o sistema" aria-label="Personalizar o sistema"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" focusable="false"><path d="M19.43 12.98c.04-.32.07-.64.07-.98s-.03-.66-.07-.98l2.11-1.65c.19-.15.24-.42.12-.64l-2-3.46a.5.5 0 0 0-.61-.22l-2.49 1c-.52-.4-1.08-.73-1.69-.98l-.38-2.65A.488.488 0 0 0 14 2h-4c-.25 0-.46.18-.49.42l-.38 2.65c-.61.25-1.17.59-1.69.98l-2.49-1a.566.566 0 0 0-.18-.03c-.17 0-.34.09-.43.25l-2 3.46c-.13.22-.07.49.12.64l2.11 1.65c-.04.32-.07.65-.07.98s.03.66.07.98l-2.11 1.65c-.19.15-.24.42-.12.64l2 3.46a.5.5 0 0 0 .61.22l2.49-1c.52.4 1.08.73 1.69.98l.38 2.65c.03.24.24.42.49.42h4c.25 0 .46-.18.49-.42l.38-2.65c.61-.25 1.17-.59 1.69-.98l2.49 1c.06.02.12.03.18.03.17 0 .34-.09.43-.25l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.65zM12 15.5c-1.93 0-3.5-1.57-3.5-3.5s1.57-3.5 3.5-3.5 3.5 1.57 3.5 3.5-1.57 3.5-3.5 3.5z"/></svg></button>
+    <button id="btnMinhaSenha" type="button" title="Trocar a minha senha">Minha senha</button>
+    <button id="btnSair">Sair</button>
+  </nav>
+</header>
+<main>
+  <div id="faixaAviso" class="faixa-aviso" role="alert" hidden>Não foi possível atualizar os dados. O que aparece na tela pode estar desatualizado. Verifique a conexão com o servidor.</div>
+  <section id="aba-mapa" class="aba">
+    <div class="cd-topo cd-topo-mapa">
+      <div class="cd-bloco cd-controles">
+        <div class="cd-data">
+          <button type="button" id="mrAnt" aria-label="Dia anterior" title="Dia anterior">&lsaquo;</button>
+          <input type="date" id="mrData" aria-label="Dia do resumo">
+          <button type="button" id="mrProx" aria-label="Próximo dia" title="Próximo dia">&rsaquo;</button>
+          <button type="button" id="mrHoje">Hoje</button>
+        </div>
+        <span class="suave cd-dica-resumo">Clique em um indicador para ver a lista.</span>
+      </div>
+      <div class="cd-resumo" id="mrResumo"><p class="suave">Carregando o dia...</p></div>
+    </div>
+    <section id="mrLista" class="od-painel oculto" role="region" aria-labelledby="mrListaTit">
+      <div class="od-cab">
+        <h3 id="mrListaTit" class="od-titulo" tabindex="-1" aria-live="polite"></h3>
+        <span class="suave od-contador" id="mrListaCont"></span>
+        <input type="search" id="mrBusca" class="campo-busca" aria-label="Pesquisar nesta lista" placeholder="Pesquisar nesta lista..." autocomplete="off">
+        <button type="button" id="mrListaCal">Abrir no Calendário</button>
+        <button type="button" id="mrListaImp">Imprimir</button>
+        <button type="button" id="mrListaFechar">Fechar</button>
+      </div>
+      <div class="tabela-wrap"><table id="mrTabela" class="cd-tabela"></table></div>
+    </section>
+    <div class="barra">
+      <button id="mAnt" aria-label="Período anterior">&larr;</button>
+      <button id="mHoje">Hoje</button>
+      <button id="mProx" aria-label="Próximo período">&rarr;</button>
+      <input type="date" id="mData" aria-label="Data inicial">
+      <select id="mSemanas" aria-label="Período">
+        <option value="7">1 semana</option><option value="14" selected>2 semanas</option><option value="28">4 semanas</option>
+      </select>
+      <button type="button" id="mOcupacao" class="oc-abrir" data-origem="mapa">Imprimir relatório de ocupação</button>
+      <span class="esp"></span>
+      <button id="btnImportar" class="oculto">Importar exemplos</button>
+      <button id="btnBackupAgora" data-cap="backup" class="oculto">Fazer backup agora</button>
+      <a class="btn oculto" href="/api/export.csv" id="btnBackup" data-cap="export.completo">Backup CSV</a>
+    </div>
+    <div class="mapa-wrap"><div class="mapa" id="mapa"></div></div>
+    <div class="legenda" id="legenda"></div>
+  </section>
+
+  <section id="aba-calendario" class="aba" aria-label="Calendário">
+    <div class="cd-cal nao-imprimir">
+      <div class="cd-cal-topo">
+        <button type="button" id="cdMesAnt" aria-label="Mês anterior" title="Mês anterior">&lsaquo;</button>
+        <h2 class="cd-cal-titulo" id="cdMesTitulo" aria-live="polite"></h2>
+        <button type="button" id="cdMesProx" aria-label="Próximo mês" title="Próximo mês">&rsaquo;</button>
+        <button type="button" id="cdMesHoje">Hoje</button>
+        <span class="suave cd-cal-dica">Escolha um dia para ver as disponibilidades. O número em cada dia é a quantidade de apartamentos livres na noite.</span>
+      </div>
+      <div class="cd-cal-grade" id="cdMes"></div>
+    </div>
+    <div class="cd-topo nao-imprimir">
+      <div class="cd-bloco cd-controles">
+        <div class="cd-data">
+          <button type="button" id="cdAnt" aria-label="Dia anterior" title="Dia anterior">&lsaquo;</button>
+          <input type="date" id="cdData" aria-label="Dia escolhido">
+          <button type="button" id="cdProx" aria-label="Próximo dia" title="Próximo dia">&rsaquo;</button>
+          <button type="button" id="cdHoje">Hoje</button>
+        </div>
+        <div class="cd-modos" role="group" aria-label="Modo de exibição">
+          <button type="button" id="cdModoLista" aria-pressed="true">Mapa de reserva</button>
+          <button type="button" id="cdModoGrade" aria-pressed="false">Mapa de apartamento</button>
+        </div>
+      </div>
+      <div class="cd-resumo" id="cdResumo"><p class="suave">Carregando o dia...</p></div>
+    </div>
+    <div class="od-cab od-cab-cal nao-imprimir">
+      <h3 id="cdListaTit" class="od-titulo" tabindex="-1"></h3>
+      <span class="suave od-contador" id="cdListaResumo"></span>
+    </div>
+    <div class="barra cd-barra nao-imprimir">
+      <input type="search" id="cdBusca" class="campo-busca" placeholder="Pesquisar por nome, apartamento, grupo, reserva..." aria-label="Pesquisar no dia" autocomplete="off">
+      <span class="suave cd-contagem" id="cdContagem" role="status" aria-live="polite"></span>
+      <button type="button" id="cdLimpar" class="oculto">Limpar filtros</button>
+      <button type="button" id="cdImprimir">Imprimir</button>
+    </div>
+    <div class="cd-avisos nao-imprimir" id="cdAvisos" role="status"></div>
+    <div class="so-impressao cd-cab-imp" id="cdCabImp"></div>
+    <div class="so-impressao cd-sub-imp" id="cdSubImp"></div>
+    <div class="tabela-wrap" id="cdListaWrap"><table id="cdTabela" class="cd-tabela"></table></div>
+    <div class="cd-grade oculto" id="cdGrade"></div>
+    <div class="legenda cd-legenda nao-imprimir" id="cdLegenda"></div>
+    <p class="suave cd-nota nao-imprimir">Check-in a partir das 14h e check-out até as 12h. O sistema ainda não registra a chegada e a saída efetivas: tudo aqui é calculado pelas datas das reservas. Atualiza a cada 8 s.</p>
+  </section>
+
+  <section id="aba-folha" class="aba">
+    <div class="barra nao-imprimir">
+      <button id="fAnt">&larr; Semana anterior</button>
+      <button id="fHoje">Esta semana</button>
+      <button id="fProx">Próxima semana &rarr;</button>
+      <span class="esp"></span>
+      <label class="rotulo-inline">Papel
+        <select class="sel-orientacao" aria-label="Orientação do papel">
+          <option value="paisagem">Paisagem</option>
+          <option value="retrato">Retrato</option>
+        </select>
+      </label>
+      <button id="fImprimir" type="button">Imprimir</button>
+      <button type="button" id="fOcupacao" class="oc-abrir" data-origem="folha">Relatório de ocupação</button>
+      <a class="btn primario" id="fPdf" href="#">Baixar PDF</a>
+      <a class="btn" id="fCsv" href="#">Baixar CSV</a>
+    </div>
+    <div class="so-impressao" id="folhaCab"></div>
+    <div class="tabela-wrap"><table id="tabFolha"></table></div>
+  </section>
+
+
+  <section id="aba-governanca" class="aba" aria-label="Governança">
+    <div class="gv-tela nao-imprimir">
+      <div class="gv-topo">
+        <h2 class="gv-titulo">Governança <span class="gv-data suave" id="gvData"></span> <span class="gv-hora suave" id="gvHora"></span></h2>
+        <div class="gv-topo-acoes">
+          <button type="button" id="gvFolha">Folha da semana</button>
+          <button type="button" id="gvImprimirHoje">Imprimir hoje</button>
+          <button type="button" id="gvImprimirAmanha">Imprimir amanhã</button>
+        </div>
+      </div>
+      <div class="gv-offline-faixa oculto" id="gvOffline" role="alert"><span id="gvOfflineTxt"></span> <button type="button" id="gvTentarRede">Tentar de novo</button></div>
+      <div class="gv-filtros">
+        <label class="gv-campo">Andar<select id="gvAndar" aria-label="Andar">
+          <option value="">Todos</option><option>Térreo</option><option>2º andar</option><option>3º andar</option><option>Chalés</option></select></label>
+        <label class="gv-campo">Situação<select id="gvSituacao" aria-label="Situação">
+          <option value="">Todas</option><option value="suja">Suja</option><option value="em_arrumacao">Em arrumação</option><option value="pronta">Pronta</option>
+          <option value="hospedada">Hospedada</option><option value="aguardando_saida">Aguardando saída</option><option value="manutencao">Manutenção</option>
+          <option value="interditada">Interditada</option></select></label>
+        <label class="gv-campo gv-campo-busca">Buscar<input type="search" id="gvBusca" inputmode="numeric" placeholder="Número, ex.: 202" autocomplete="off" aria-label="Buscar por número da unidade"></label>
+        <div class="gv-chips" role="group" aria-label="Filtros rápidos">
+          <button type="button" class="gv-chip" id="gvChipSujas" aria-pressed="false">Sujas</button>
+          <button type="button" class="gv-chip" id="gvChipArrumacao" aria-pressed="false">Em arrumação</button>
+          <button type="button" class="gv-chip" id="gvChipChegam" aria-pressed="false">Chegam hoje</button>
+          <button type="button" class="gv-chip" id="gvChipSaem" aria-pressed="false">Saem hoje</button>
+        </div>
+        <div class="gv-filtros-acoes">
+          <button type="button" id="gvSelecionar" aria-pressed="false">Selecionar</button>
+          <button type="button" id="gvTodos" class="oculto">Selecionar todos</button>
+          <button type="button" id="gvRestaurar" class="oculto">Restaurar filtros</button>
+        </div>
+      </div>
+      <div class="gv-msg oculto" id="gvMsg"></div>
+      <div id="gvLista" class="gv-lista"></div>
+      <div class="gv-totais" id="gvTotais" role="group" aria-label="Totais (tocar para filtrar)"></div>
+      <div class="gv-barra oculto" id="gvBarra" role="region" aria-label="Ação em massa"></div>
+      <div class="gv-toast oculto" id="gvToast" role="status"><span id="gvToastTxt"></span> <button type="button" id="gvDesfazer">Desfazer</button> <button type="button" id="gvFecharToast" aria-label="Fechar aviso">&times;</button></div>
+      <div class="gv-sr" id="gvLive" aria-live="polite"></div>
+    </div>
+    <div class="so-impressao gvi" id="gvImpressao"></div>
+  </section>
+
+  <section id="aba-camareiras" class="aba">
+    <div class="barra nao-imprimir">
+      <label class="rotulo-inline">De <input type="date" id="cInicio"></label>
+      <label class="rotulo-inline">até <input type="date" id="cFim"></label>
+      <button id="cHoje">Hoje</button>
+      <button id="cAmanha">Amanhã</button>
+      <button id="cSemana">Semana</button>
+    </div>
+    <div class="barra nao-imprimir">
+      <label class="rotulo-inline"><input type="checkbox" id="cEstadias"> Mostrar estadias (hóspedes que ficam)</label>
+      <label class="rotulo-inline"><input type="checkbox" id="cNomes"> Mostrar nome do hóspede</label>
+      <label class="rotulo-inline"><input type="checkbox" id="cPagina"> Uma página por dia</label>
+      <span class="esp"></span>
+      <label class="rotulo-inline">Papel
+        <select class="sel-orientacao" aria-label="Orientação do papel">
+          <option value="paisagem">Paisagem</option>
+          <option value="retrato">Retrato</option>
+        </select>
+      </label>
+      <button class="primario" id="cImprimir">Imprimir</button>
+    </div>
+    <div class="cam-cab" id="camCab"></div>
+    <div id="camLista"></div>
+  </section>
+
+  <section id="aba-canceladas" class="aba">
+    <p class="suave">Reservas canceladas não ocupam a unidade. Elas continuam guardadas, com o motivo.</p>
+    <div class="tabela-wrap"><table id="tabCanceladas"></table></div>
+  </section>
+
+  <section id="aba-historico" class="aba">
+    <p class="suave">Registro de tudo o que foi feito no sistema (não pode ser alterado nem apagado).</p>
+    <div class="tabela-wrap"><table id="tabHistorico"></table></div>
+  </section>
+
+  <section id="aba-usuarios" class="aba">
+    <div class="barra">
+      <button type="button" class="primario" id="uNovo">+ Novo usuário</button>
+      <span class="suave">Quem entra no sistema e o que cada pessoa pode fazer.</span>
+    </div>
+    <div class="tabela-wrap"><table id="tabUsuarios"></table></div>
+    <h3 class="sub-perfis">O que cada perfil pode fazer</h3>
+    <ul class="lista-perfis suave" id="listaPerfis"></ul>
+  </section>
+
+  <section id="aba-buscar" class="aba">
+    <div class="barra"><input type="search" id="busca" placeholder="Nome, unidade, observação..." class="campo-busca" aria-label="Buscar"></div>
+    <div id="resultados"></div>
+  </section>
+  <div class="so-impressao oc-imp" id="ocImpressao"></div>
+  <div class="so-impressao fnrh-imp" id="fnrhImpressao"></div>
+  <div class="so-impressao ex-imp" id="rcExtratoImp"></div>
+</main>
+
+<dialog id="dlg">
+  <form id="form" autocomplete="off">
+    <h2 id="dlgTitulo">Nova reserva</h2>
+    <div class="abas-form" id="abasForm" role="tablist">
+      <button type="button" class="ativo" data-painel="dados" role="tab">Dados</button>
+      <button type="button" data-painel="historico" id="abaHistForm" class="oculto" role="tab">Histórico</button>
+    </div>
+    <div id="painel-dados">
+    <div class="duas">
+      <label class="campo">Unidade<select id="fa"></select></label>
+      <label class="campo">Pessoas<input type="number" id="fn" min="1" max="50" value="2"></label>
+    </div>
+    <label class="campo">Nome do hóspede<input type="text" id="fnome" maxlength="120"></label>
+    <div class="duas">
+      <label class="campo">Entrada<input type="date" id="fi"></label>
+      <label class="campo">Saída<input type="date" id="ff"></label>
+    </div>
+    <p class="suave dica-horario">Check-in a partir das 14h. Check-out até as 12h.</p>
+    <label class="campo">Hóspede<select id="ftipo">
+      <option value="">Não informado</option><option value="socio">Sócio do clube</option><option value="convidado">Convidado</option></select></label>
+    <div id="blocoDiaria" class="oculto">
+      <label class="campo">Valor da diária (R$)<input type="text" id="fdiaria" inputmode="decimal" maxlength="14" placeholder="ex.: 123,45" autocomplete="off"></label>
+      <p class="suave total-diaria" id="fdiariaTotal"></p>
+    </div>
+    <label class="campo">Pagamento<select id="fp">
+      <option value="pendente">Pendente</option><option value="parcial">Parcial</option><option value="pago">Pago</option>
+      <option value="pousada">Paga na pousada</option><option value="gratis">Grátis</option></select></label>
+    <label class="campo">Grupo / turma (opcional)<input type="text" id="fgrupo" maxlength="120"></label>
+    <label class="campo">Extras (um por linha: acompanhantes, berço, cama extra...)<textarea id="fextras" rows="3" maxlength="1000"></textarea></label>
+    <label class="campo">Observações<textarea id="fo" rows="2" maxlength="1000"></textarea></label>
+    <p class="aviso-cartao oculto" id="avisoCartao" role="status">Atenção: parece haver um número de cartão num dos campos. O sistema não guarda números de cartão; escreva apenas, por exemplo, "pago no cartão (final 1234)".</p>
+    <div class="aviso" id="aviso" role="status" aria-live="polite"></div>
+    <div class="bloco-cancelar oculto" id="blocoCancelar">
+      <label class="campo">Motivo do cancelamento (obrigatório)<input type="text" id="fmotivo" maxlength="300"></label>
+      <div class="acoes">
+        <button type="button" class="perigo confirmar" id="btnConfirmarCancelar">Confirmar cancelamento</button>
+        <button type="button" id="btnDesistirCancelar">Voltar</button>
+      </div>
+    </div>
+    <div class="acoes" id="acoesForm">
+      <button type="submit" class="primario" id="btnSalvar">Salvar</button>
+      <button type="button" id="btnCancelar">Fechar</button>
+      <span class="esp"></span>
+      <button type="button" class="perigo oculto" id="btnExcluir">Cancelar reserva</button>
+    </div>
+    </div>
+    <div id="painel-historico" class="oculto">
+      <div class="tabela-wrap"><table id="tabHistForm"></table></div>
+      <div class="acoes"><button type="button" id="btnFecharHist">Fechar</button></div>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="dlgOcupacao" class="oc-dlg" aria-labelledby="ocTit">
+  <form id="ocForm" autocomplete="off" novalidate>
+    <h2 id="ocTit" tabindex="-1">Relatório de ocupação</h2>
+    <p class="suave">Escolha o período a imprimir (no máximo 92 dias).</p>
+    <div class="duas">
+      <label class="campo">De<input type="date" id="ocInicio"></label>
+      <label class="campo">Até<input type="date" id="ocFim"></label>
+    </div>
+    <div class="oc-atalhos" role="group" aria-label="Períodos prontos">
+      <button type="button" data-atalho="hoje">Hoje</button>
+      <button type="button" data-atalho="semana">Esta semana</button>
+      <button type="button" data-atalho="mes">Este mês</button>
+      <button type="button" data-atalho="proximo">Próximo mês</button>
+      <button type="button" data-atalho="mapa">Período do mapa</button>
+    </div>
+    <label class="campo">Papel
+      <select id="ocOrientacao"><option value="paisagem">Paisagem</option><option value="retrato">Retrato</option></select>
+    </label>
+    <p class="suave" id="ocInfo" aria-live="polite"></p>
+    <div class="aviso" id="ocMsg" role="alert"></div>
+    <div class="acoes">
+      <button type="button" class="primario" id="ocImprimir">Imprimir</button>
+      <button type="button" id="ocPdf">Baixar PDF</button>
+      <button type="button" id="ocCancelar">Cancelar</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="dlgInfo" class="od-dlg" aria-labelledby="infoTit">
+  <div class="od-dlg-cab">
+    <h2 id="infoTit" tabindex="-1"></h2>
+    <button type="button" class="od-fechar" id="infoFechar" aria-label="Fechar informações">&times;</button>
+  </div>
+  <dl id="infoLista" class="od-dl"></dl>
+  <div class="acoes">
+    <button type="button" class="primario oculto" id="infoAbrir">Abrir a reserva</button>
+    <button type="button" id="infoFechar2">Fechar</button>
+  </div>
+</dialog>
+
+<dialog id="dlgNotas" class="od-dlg" aria-labelledby="notasTit">
+  <div class="od-dlg-cab">
+    <h2 id="notasTit" tabindex="-1"></h2>
+    <button type="button" class="od-fechar" id="notasFechar" aria-label="Fechar observações">&times;</button>
+  </div>
+  <div class="abas-form" id="notasAbas" role="tablist" aria-label="Tipos de observação"></div>
+  <div id="notasPainel" class="od-notas-painel" role="tabpanel" tabindex="0"></div>
+  <p class="suave od-aviso-nota">Não registre telefone, CPF, cartão ou valores aqui.</p>
+  <div class="acoes">
+    <button type="button" id="notasFechar2">Fechar</button>
+  </div>
+</dialog>
+
+<dialog id="dlgResumo" class="rc-dlg" aria-labelledby="rcTit">
+  <div class="rc-imp-cab">
+    <p class="rc-imp-pousada">Pousada Boa Esperança - Clube dos Oficiais da PM MG</p>
+    <p class="rc-imp-titulo">Resumo da conta</p>
+    <p id="rcImpEmitido"></p>
+  </div>
+  <div class="rc-cab">
+    <div class="rc-cab-tit">
+      <h2 id="rcTit" tabindex="-1"></h2>
+      <span id="rcSit" class="rc-sit"></span>
+    </div>
+    <div id="rcTotal" class="rc-cab-total"></div>
+    <button type="button" class="od-fechar" id="rcFechar" aria-label="Fechar o resumo da conta">&times;</button>
+  </div>
+  <p id="rcMudou" class="rc-mudou oculto" role="status"><span>Esta reserva mudou.</span> <button type="button" id="rcRecarregar">Recarregar</button></p>
+  <section id="rcContas" class="rc-contas oculto" aria-label="Contas abertas">
+    <button type="button" id="rcContasBtn" aria-expanded="false" aria-controls="rcContasLista"></button>
+    <ul id="rcContasLista" class="rc-contas-lista oculto"></ul>
+  </section>
+  <div class="rc-corpo" id="rcCorpo">
+    <details id="rcFaixa" class="rc-faixa" open>
+      <summary>Resumo da conta</summary>
+      <div class="rc-grade">
+        <section class="rc-cartao" id="rcCartao" aria-label="Dados da reserva"></section>
+        <section class="rc-obs" aria-label="Observações">
+          <div class="abas-form" id="rcAbas" role="tablist" aria-label="Tipos de observação"></div>
+          <div id="rcPainel" class="od-notas-painel rc-painel" role="tabpanel" tabindex="0"></div>
+          <p class="suave od-aviso-nota">Não registre telefone, CPF, cartão ou valores aqui.</p>
+        </section>
+      </div>
+    </details>
+    <section class="rc-hospede" id="rcHospede" aria-label="Hóspede titular"></section>
+  </div>
+  <div class="rc-base">
+    <button type="button" id="rcFechar2">Fechar</button>
+    <button type="button" id="rcBaseDespesas" class="oculto">Despesas</button>
+    <button type="button" id="rcBaseImprimir" class="primario">Imprimir resumo</button>
+  </div>
+  <div class="rc-ficha-ass" aria-hidden="true"><div class="rc-ass-linhas"><span>Assinatura do hóspede</span><span>Recepção</span></div></div>
+</dialog>
+
+<dialog id="dlgDesp" class="od-dlg ds-dlg" aria-labelledby="dsTit">
+  <div class="od-dlg-cab">
+    <h2 id="dsTit" tabindex="-1"></h2>
+    <button type="button" class="od-fechar" id="dsFechar" aria-label="Fechar despesas">&times;</button>
+  </div>
+  <div class="ds-imp-cab">
+    <p class="ds-imp-pousada">Pousada Boa Esperança - Clube dos Oficiais da PM MG</p>
+    <p class="ds-imp-titulo">Extrato de despesas</p>
+    <p id="dsImpInfo"></p>
+    <p id="dsImpEstado" class="ds-imp-estado"></p>
+  </div>
+  <p id="dsSituacao" class="ds-situacao"></p>
+  <form id="dsForm" class="ds-form oculto" novalidate autocomplete="off">
+    <label>Categoria
+      <select id="dsCat">
+        <option value="restaurante">Restaurante</option>
+        <option value="bar">Bar / frigobar</option>
+        <option value="lavanderia">Lavanderia</option>
+        <option value="outros">Outros</option>
+      </select>
+    </label>
+    <label class="ds-f-desc">Descrição
+      <input type="text" id="dsDesc" maxlength="80" autocomplete="off" placeholder="Ex.: Água 500ml">
+    </label>
+    <label>Qtd
+      <input type="number" id="dsQtd" min="1" max="99" step="1" value="1" inputmode="numeric">
+    </label>
+    <label>Valor unitário (R$)
+      <input type="text" id="dsValor" inputmode="decimal" autocomplete="off" placeholder="0,00">
+    </label>
+    <p class="ds-f-total">Total: <strong id="dsTotalVivo">R$ 0,00</strong></p>
+    <button type="submit" class="primario" id="dsLancar">Lançar</button>
+  </form>
+  <p id="dsAvisoCartao" class="aviso-cartao oculto">Isto parece um número de cartão. O sistema não guarda números de cartão: apague os números.</p>
+  <p id="dsMsg" class="ds-msg" role="status" aria-live="polite"></p>
+  <form id="dsEstorno" class="ds-estorno oculto" novalidate>
+    <p id="dsEstornoTxt"></p>
+    <label>Motivo do estorno (obrigatório)
+      <input type="text" id="dsMotivo" maxlength="140" autocomplete="off">
+    </label>
+    <p id="dsMotivoAviso" class="aviso-cartao oculto">Isto parece um número de cartão. O sistema não guarda números de cartão: apague os números.</p>
+    <div class="acoes">
+      <button type="submit" class="primario" id="dsConfirmarEstorno">Confirmar estorno</button>
+      <button type="button" id="dsCancelarEstorno">Voltar</button>
+    </div>
+  </form>
+  <p id="dsVazio" class="suave ds-vazio">Nenhuma despesa lançada.</p>
+  <div class="tabela-wrap ds-wrap">
+    <table id="dsTabela" class="ds-tabela oculto">
+      <thead><tr><th>Data</th><th>Categoria</th><th>Descrição</th><th>Qtd</th><th>Unitário</th><th>Total</th><th>Quem</th><th>Situação</th></tr></thead>
+      <tbody id="dsLista"></tbody>
+    </table>
+  </div>
+  <div class="ds-imp-ass">
+    <p id="dsImpEmitido"></p>
+    <div class="ds-ass-linhas"><span>Hóspede</span><span>Recepção</span></div>
+  </div>
+  <div class="ds-rodape">
+    <dl id="dsTotais" class="ds-totais"></dl>
+    <div class="acoes">
+      <button type="button" id="dsImprimir">Imprimir extrato</button>
+      <button type="button" id="dsFechar2">Fechar</button>
+    </div>
+  </div>
+</dialog>
+
+<dialog id="gvMenu" class="gv-folha" aria-labelledby="gvMenuTit">
+  <h2 id="gvMenuTit"></h2>
+  <div class="gv-menu-itens" id="gvMenuItens"></div>
+  <div class="acoes"><button type="button" id="gvMenuFechar">Fechar</button></div>
+</dialog>
+
+<dialog id="gvDlg" aria-labelledby="gvDlgTit">
+  <form id="gvDlgForm" autocomplete="off">
+    <h2 id="gvDlgTit"></h2>
+    <p class="gv-dlg-texto" id="gvDlgTexto"></p>
+    <ul class="gv-dlg-lista oculto" id="gvDlgLista"></ul>
+    <label class="campo oculto" id="gvDlgCampo"><span id="gvDlgRotulo"></span><textarea id="gvDlgValor" rows="3" maxlength="140"></textarea><span class="suave" id="gvDlgContador"></span></label>
+    <div class="aviso erro" id="gvDlgAviso" role="alert"></div>
+    <div class="acoes"><button type="submit" class="primario" id="gvDlgOk">Confirmar</button><button type="button" id="gvDlgNao">Cancelar</button></div>
+  </form>
+</dialog>
+
+<dialog id="dlgPref" aria-labelledby="prefTitulo">
+  <form id="formPref" autocomplete="off">
+    <h2 id="prefTitulo">Personalizar o sistema</h2>
+    <p class="suave dica-pref">Escolha o que aparece para você. Isto só muda a sua tela: não altera o que você pode fazer, nem a tela das outras pessoas.</p>
+    <fieldset class="grupo-pref">
+      <legend>Menus visíveis</legend>
+      <div id="prefMenus"></div>
+    </fieldset>
+    <label class="campo">Aba ao abrir<select id="prefAba"></select></label>
+    <label class="campo" id="prefCampoMapa">Mapa: período ao abrir
+      <select id="prefSemanas"><option value="7">1 semana</option><option value="14">2 semanas</option><option value="28">4 semanas</option></select>
+    </label>
+    <div class="aviso" id="prefAviso" role="alert"></div>
+    <div class="acoes">
+      <button type="submit" class="primario" id="prefSalvar">Salvar</button>
+      <button type="button" id="prefRestaurar">Restaurar padrão</button>
+      <span class="esp"></span>
+      <button type="button" id="prefFechar">Fechar</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="dlgSenha">
+  <form id="formSenha" autocomplete="off">
+    <h2>Troque a sua senha</h2>
+    <p class="suave">Por segurança, defina uma senha nova (mínimo de 10 caracteres) antes de continuar.</p>
+    <label class="campo">Senha atual<input type="password" id="senhaAtual" autocomplete="current-password" maxlength="200"></label>
+    <label class="campo">Senha nova<input type="password" id="senhaNova" autocomplete="new-password" maxlength="200"></label>
+    <div class="aviso" id="avisoSenha" role="alert"></div>
+    <div class="acoes">
+      <button type="submit" class="primario">Trocar senha</button>
+      <button type="button" class="oculto" id="btnSenhaFechar">Fechar</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="dlgUsu">
+  <form id="formUsu" autocomplete="off">
+    <h2 id="uTitulo">Novo usuário</h2>
+    <label class="campo" id="uCampoLogin">Login (para entrar no sistema)<input type="text" id="uLogin" maxlength="40" autocomplete="off"></label>
+    <label class="campo" id="uCampoNome">Nome da pessoa<input type="text" id="uNome" maxlength="120" autocomplete="off"></label>
+    <label class="campo" id="uCampoPapel">Perfil<select id="uPapel"></select></label>
+    <p class="suave" id="uDica"></p>
+    <div id="uCampoSenha">
+      <label class="campo">Senha provisória (mínimo de 10 caracteres)<input type="text" id="uSenha" maxlength="200" autocomplete="off"></label>
+      <div class="acoes"><button type="button" id="uGerar">Gerar senha</button></div>
+      <p class="suave">A pessoa será obrigada a trocar essa senha no primeiro acesso. Anote e entregue a senha com segurança.</p>
+    </div>
+    <div class="aviso" id="uAviso" role="status" aria-live="polite"></div>
+    <div class="acoes">
+      <button type="submit" class="primario" id="uSalvar">Salvar</button>
+      <button type="button" id="uFechar">Fechar</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="dlgImp" class="larga">
+  <h2>Importar lista (Excel)</h2>
+  <p class="suave dica-imp">Escolha a planilha (.xlsx, até 5 MB). Nada é gravado até você clicar em "Importar".</p>
+  <div class="barra">
+    <input type="file" id="impArq" accept=".xlsx" aria-label="Arquivo da planilha">
+    <label class="rotulo-inline"><input type="checkbox" id="impPassadas"> Incluir reservas já encerradas</label>
+  </div>
+  <div class="barra" id="impAbas"></div>
+  <div class="barra">
+    <button type="button" class="primario" id="impPrevia" disabled>Pré-visualizar</button>
+    <label class="rotulo-inline"><input type="checkbox" id="impVerIgn"> Mostrar linhas ignoradas</label>
+  </div>
+  <div class="aviso" id="impMsg" role="status" aria-live="polite"></div>
+  <div class="conts" id="impConts"></div>
+  <div class="tabela-wrap"><table id="impTab"></table></div>
+  <div id="impEspera"></div>
+  <div class="acoes acoes-imp">
+    <button type="button" class="primario" id="impGravar" disabled>Importar 0 reservas</button>
+    <button type="button" class="perigo oculto" id="impDesfazer">Desfazer importação</button>
+    <span class="esp"></span>
+    <button type="button" id="impFechar">Fechar</button>
+  </div>
+</dialog>
+<div id="toast" role="status"></div>
+
+<script src="/static/app.js"></script>
+<script src="/static/cartao.js"></script>
+<script src="/static/calendario_dia.js"></script>
+<script src="/static/operacao_dia.js"></script>
+<script src="/static/operacao_acoes.js"></script>
+<script src="/static/operacao_dialogos.js"></script>
+<script src="/static/notas_logica.js"></script>
+<script src="/static/notas_painel.js"></script>
+<script src="/static/notas_editor.js"></script>
+<script src="/static/notas_abas.js"></script>
+<script src="/static/operacao_notas.js"></script>
+<script src="/static/despesas_logica.js"></script>
+<script src="/static/despesas_form.js"></script>
+<script src="/static/despesas.js"></script>
+<script src="/static/resumo_logica.js"></script>
+<script src="/static/resumo_conta.js"></script>
+<script src="/static/resumo_itens.js"></script>
+<script src="/static/fnrh.js"></script>
+<script src="/static/resumo_acoes.js"></script>
+<script src="/static/resumo_estado.js"></script>
+<script src="/static/resumo_hospedes.js"></script>
+<script src="/static/resumo_pag_logica.js"></script>
+<script src="/static/resumo_barra.js"></script>
+<script src="/static/resumo_pagamento.js"></script>
+<script src="/static/resumo_estornar.js"></script>
+<script src="/static/resumo_ligar.js"></script>
+<script src="/static/operacao_dia_tela.js"></script>
+<script src="/static/ocupacao_logica.js"></script>
+<script src="/static/ocupacao.js"></script>
+<script src="/static/preferencias.js"></script>
+<script src="/static/governanca_logica.js"></script>
+<script src="/static/governanca.js"></script>
+<script src="/static/mapa_arrastar.js"></script>
+</body>
+</html>

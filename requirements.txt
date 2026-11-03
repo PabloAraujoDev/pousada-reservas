@@ -1,0 +1,8 @@
+# Faixas seguras (ultima verificacao com pip-audit: 2026-10). Atualize com: pip install -U -r requirements.txt
+Flask>=3.1.3,<4
+Werkzeug>=3.1.9,<4
+openpyxl>=3.1.5,<4
+defusedxml>=0.7.1,<1          # openpyxl usa automaticamente: protege a importacao de planilhas contra XML bomb/XXE
+reportlab>=4.2,<6
+pillow>=13.0,<14              # usado pelo reportlab (versoes antigas tem CVEs)
+waitress>=3.0.2,<4            # servidor de producao (python app.py servir)

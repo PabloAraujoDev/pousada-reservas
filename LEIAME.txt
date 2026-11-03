@@ -1,0 +1,148 @@
+SISTEMA DE RESERVAS - POUSADA BOA ESPERANÇA
+===========================================
+
+PRIMEIRO USO (faça só uma vez)
+  1. Dê dois cliques em "iniciar.bat" (ele prepara tudo sozinho na primeira vez).
+     Se aparecer o aviso "ainda não existe nenhum usuário", feche a janela preta.
+  2. Abra um terminal na pasta do sistema (com o ambiente ativado: venv\Scripts\activate)
+     e digite:
+         python app.py criar-admin
+     O programa pergunta o login, o seu nome e a senha (mínimo 10 caracteres; ao digitar
+     a senha nada aparece na tela, é normal). Esse é o administrador.
+  3. Dê dois cliques em "iniciar.bat" de novo e entre com esse login e senha.
+  NÃO existe senha padrão. Se esquecer a senha do administrador, rode "criar-admin"
+  de novo com outro login e peça para desativar o antigo.
+
+COMO USAR
+  Dê dois cliques em "iniciar.bat". O navegador abre em http://localhost:5000.
+  Mantenha a janela preta aberta enquanto usa. Para sair, clique em "Sair" (canto superior).
+  Por segurança, o sistema agora só atende o PRÓPRIO computador. Para usar de outro aparelho
+  da rede da pousada, defina antes de ligar (no iniciar.bat, uma linha acima de "python app.py"):
+         set POUSADA_HOST=0.0.0.0
+         set TRUSTED_HOSTS=192.168.0.10
+  (troque pelo IP do computador) e abra http://IP-DO-COMPUTADOR:5000 no outro aparelho.
+  A sessão dura 10 horas; depois disso é preciso entrar de novo.
+
+QUEM PODE O QUÊ (perfis)
+  Administrador  Tudo: usuários, importar planilha, backup, histórico completo, excluir de vez.
+  Atendente      Ver, criar, editar e cancelar reservas; reativar canceladas; ver a folha da
+                 semana e as camareiras. NÃO importa, NÃO exclui de vez, NÃO vê o histórico
+                 completo (só o histórico de cada reserva), NÃO baixa o backup CSV completo.
+  Recepção       Ver reservas e a folha; mudar SÓ o pagamento e as observações.
+  Camareira      Só a aba "Camareiras" (sem nomes, valores, pagamento ou telefone).
+  Diretoria      Só leitura: reservas, folha, backup CSV e histórico resumido.
+  Criar outros usuários: "python app.py criar-usuario" (pergunta login, nome, papel e senha).
+  Desativar um usuário: o administrador usa a rota /api/usuarios (ainda não há tela para isso);
+  a desativação vale na hora, mesmo que a pessoa esteja logada.
+  Senhas: ficam guardadas só "embaralhadas" (hash); ninguém consegue ler a senha de ninguém.
+  Depois de 5 senhas erradas seguidas (mesmo login, mesmo aparelho) o login trava por 15 minutos.
+
+REGRAS DE HOSPEDAGEM
+  - Check-in a partir das 14h. Check-out até as 12h (o sistema só mostra o aviso; não calcula nada).
+  - Reserva = apartamento + entrada até saída (a noite da saída não conta).
+  - Sair e entrar no mesmo dia na mesma unidade é permitido.
+  - O apto 104 está OCUPADO e não aceita reservas.
+  - Café da manhã do dia: pessoas com entrada < dia <= saída.
+  - Limites: nome até 120 letras; extras e observações até 1000; grupo até 120; de 1 a 50
+    pessoas; anos de 2020 a 2100; estadia de no máximo 365 noites.
+
+CANCELAR, REATIVAR E EXCLUIR
+  - "Cancelar reserva" (no formulário) pede o MOTIVO. A reserva sai do mapa, libera a unidade,
+    deixa de contar no café e nas camareiras, mas continua guardada.
+  - A aba "Canceladas" (administrador e atendente) mostra as canceladas e o botão "Reativar".
+    Ao reativar o sistema confere de novo se a unidade ainda está livre.
+  - "Excluir definitivamente" (só administrador, na aba Canceladas) apaga de verdade e fica
+    registrado no histórico.
+
+HISTÓRICO (quem fez o quê)
+  Tudo fica registrado: criar, alterar, cancelar, reativar, importar, desfazer, backup, entradas
+  no sistema e tentativas de login que falharam. O registro NÃO pode ser alterado nem apagado.
+  Guarda só o que mudou em unidade, datas, pessoas e pagamento (do nome só anota "alterado");
+  nunca guarda extras, observações, senhas ou códigos de acesso.
+  Na reserva: aba "Histórico" (administrador e atendente). Tela "Histórico": administrador (completo)
+  e diretoria (resumido).
+
+BACKUP (CÓPIA DE SEGURANÇA) - LEIA COM ATENÇÃO
+  - O sistema faz cópias sozinho: ao ligar, antes de importar planilha, antes de atualizar o
+    banco para uma versão nova e a cada 6 horas. Guarda as 30 mais recentes.
+  - Botão "Fazer backup agora" (administrador, aba Mapa).
+  - As cópias ficam em  %LOCALAPPDATA%\PousadaBackups  (fora do OneDrive). Para usar outra pasta,
+    defina POUSADA_BACKUP_DIR (ex.: set POUSADA_BACKUP_DIR=D:\Backups). O sistema RECUSA qualquer
+    pasta com "OneDrive" no caminho. Cada cópia é conferida (teste de integridade) ao ser feita.
+  - Para restaurar (com o sistema DESLIGADO, janela preta fechada):
+         python app.py restaurar "C:\...\PousadaBackups\reservas_AAAAMMDD_HHMMSS.db"
+    O banco que estava em uso é guardado antes como reservas_pre_restauracao_....db.
+  - IMPORTANTE: o arquivo reservas.db NÃO deveria ficar numa pasta do OneDrive (ele pode ser
+    copiado pela metade e estragar). Para guardá-lo em outro lugar, defina antes de ligar:
+         set POUSADA_DB=C:\PousadaDados\reservas.db
+    (crie a pasta antes; ao ligar, o banco novo é criado lá. Para levar as reservas que já
+    existem, restaure um backup nesse caminho com o comando "restaurar" acima.)
+  - A chave secreta dos logins fica em instance\secret.key (não vai para o Git). Se apagar o
+    arquivo, todos precisam entrar de novo - nada mais acontece.
+
+O QUE É CADA ARQUIVO
+  iniciar.bat            Liga o sistema (cria a pasta venv e instala o Flask).
+  app.py                 Ponto de entrada: liga o servidor e roda os comandos criar-admin,
+                         criar-usuario e restaurar.
+  requirements.txt       Lista dos programas de apoio (Flask, openpyxl e pytest).
+  seed.json              Reservas FICTÍCIAS de exemplo (botão "Importar exemplos"). Não vai para o Git.
+  reservas.db            O banco de dados (criado sozinho). Guarda TODAS as reservas.
+  instance\              Chave secreta dos logins (criada sozinha).
+  .gitignore             Diz ao Git o que não deve ser versionado (banco, backups, seed, instance).
+  pousada/__init__.py    Monta o aplicativo.
+  pousada/config.py      Configurações (porta, host, local do banco, chave secreta).
+  pousada/db.py          Conversa com o banco e aplica as migrações (cada uma "tudo ou nada").
+  pousada/regras.py      Regras: unidades, limites, datas válidas, conflitos, café da manhã.
+  pousada/seguranca.py   Porteiro de cada pedido: login, proteção CSRF, cabeçalhos de segurança.
+  pousada/permissoes.py  A tabela de quem pode o quê (por perfil).
+  pousada/usuarios.py    Usuários, senhas e limite de tentativas de login.
+  pousada/historico.py   Registro de auditoria.
+  pousada/backup.py      Cópias de segurança e restauração.
+  pousada/erros.py       Respostas de erro em JSON.
+  pousada/cli.py         Comandos de terminal (criar-admin, criar-usuario, restaurar).
+  pousada/rotas.py       Reservas, exportação CSV e camareiras.
+  pousada/rotas_auth.py  Entrar, sair, sessão, trocar a própria senha.
+  pousada/rotas_admin.py Usuários, backup e histórico.
+  pousada/rotas_importacao.py  Importar exemplos e planilha Excel (prévia, confirmar, desfazer).
+  pousada/importador.py  O "leitor" da planilha Excel: entende apto, datas, pagamento, acompanhantes
+                         e lista de espera, e grava tudo de uma vez.
+  pousada/validacao_xlsx.py  Conferências de segurança da planilha (contra arquivos maliciosos).
+  pousada/camareiras.py  Monta a folha das camareiras (sem valores, pagamento ou telefone).
+  migrations/            Receitas SQL que criam/atualizam o banco (001 a 006). Rodam sozinhas ao
+                         ligar, fazem backup antes e NÃO apagam dados. A 005 recria a tabela de
+                         reservas copiando tudo (para acrescentar cancelamento e regras de validação).
+  static/index.html, app.css, app.js   A tela do sistema (mapa, folha, camareiras, busca, canceladas,
+                         histórico, formulário, importação).
+  static/login.html, login.js          A tela de entrada.
+  tests/                 Testes automáticos (rode "pytest" com o venv ativo). Usam bancos temporários
+                         e planilhas inventadas, sem dados de clientes.
+
+IMPORTAR LISTA (PLANILHA EXCEL) - só administrador
+  1. Clique em "Importar lista" (no topo) e escolha o arquivo .xlsx (até 5 MB).
+  2. Por padrão só as abas de OUTUBRO, NOVEMBRO e DEZEMBRO vêm marcadas. Marque outras
+     se quiser e clique em "Pré-visualizar". Nada é gravado nessa etapa.
+  3. A tabela mostra um semáforo por linha: verde = pronta, amarelo = aviso, vermelho = erro
+     (data impossível como 31/11, apto que não existe, conflito de datas). Linhas vermelhas podem
+     ser corrigidas ali mesmo. Cinza = ignorada (já encerrada, apto 104, repetida na virada do
+     mês ou já importada antes).
+  4. Clique em "Importar N reservas". Ou tudo é gravado, ou nada. Antes é feito um backup.
+  5. Errou? Clique em "Desfazer importação": remove só as reservas dessa importação.
+  - Importar o mesmo arquivo de novo não cria nada duplicado. Se o MESMO arquivo já foi importado
+    antes, aparece um aviso (não bloqueia).
+  - O sistema recusa arquivos que não são planilhas de verdade, arquivos "bomba" (minúsculos que
+    viram gigantes ao abrir) e planilhas com mais de 24 abas. Nada é gravado em disco.
+  - Reserva cancelada não "volta" ao reimportar a mesma planilha.
+  - A "LISTA DE ESPERA" vira pedidos guardados à parte. Os "CANCELAMENTOS" da planilha são ignorados.
+  - O texto da coluna E (pagamento/contato) vai inteiro para as Observações da reserva.
+  - Acompanhantes viram "Extras", um por linha. Turmas/grupos aparecem na barra do mapa.
+
+CAMAREIRAS (aba "Camareiras")
+  - Escolha o período (padrão: hoje até daqui a 6 dias) ou use Hoje / Amanhã / Semana.
+  - Mostra, dia a dia, as unidades com SAÍDA e ENTRADA (e ESTADIA, se marcar).
+  - Não mostra valores, pagamento nem telefone. O nome do hóspede só aparece para quem tem
+    permissão (a camareira nunca vê nomes).
+  - "Imprimir" gera uma folha A4 sem menus, com letras grandes e quadradinho "feito".
+
+BACKUP CSV (aba Mapa, administrador e diretoria)
+  Baixa todas as reservas em planilha (inclui as canceladas, com a situação). Textos que
+  começariam com = + - @ ganham um apóstrofo na frente, para o Excel não executar como fórmula.

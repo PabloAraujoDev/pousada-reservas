@@ -1,0 +1,19 @@
+# Banco de dados e cópias (dados dos hóspedes: NUNCA versionar)
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+reservas.db
+backups/
+instance/
+seed.json
+logs/
+venv/
+__pycache__/
+.pytest_cache/
+.claude/
+.env
+*.key
+secret.key
+pre-deploy-*
+*.tar.gz

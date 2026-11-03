@@ -1,0 +1,56 @@
+# Caddy: HTTPS automatico (Let's Encrypt) para o sistema da pousada.
+# Copie para /etc/caddy/Caddyfile e rode: sudo systemctl reload caddy
+# Pre-requisito: os registros DNS "A" de reservapousadaboaesperanca.com.br e www apontam para o IP da VPS.
+
+# Limites de tempo das conexoes: derrubam clientes lentos (ataque "slowloris") sem atrapalhar o uso normal.
+{
+	servers {
+		timeouts {
+			read_header 10s
+			read_body 30s
+			write 60s
+			idle 2m
+		}
+	}
+}
+
+www.reservapousadaboaesperanca.com.br {
+	redir https://reservapousadaboaesperanca.com.br{uri} permanent
+}
+
+reservapousadaboaesperanca.com.br {
+	encode gzip zstd
+
+	# Sistema Flask/waitress, que escuta SO em 127.0.0.1:5000 (nunca exposto direto).
+	reverse_proxy 127.0.0.1:5000 {
+		# O Caddy ja envia X-Forwarded-For/Proto/Host sobrescrevendo o que o cliente mandar.
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Forwarded-Proto {scheme}
+		header_up X-Forwarded-Host {host}
+	}
+
+	# Corta corpo gigante antes de chegar ao sistema (planilha maxima: 5 MB).
+	request_body {
+		max_size 7MB
+	}
+
+	header {
+		-Server
+		-Via
+	}
+
+	# HSTS, CSP etc. vem do proprio sistema (POUSADA_HTTPS=1).
+	log {
+		output file /var/log/caddy/pousada-acesso.log {
+			roll_size 10MiB
+			roll_keep 10
+		}
+		# O Caddy ja esconde Cookie/Authorization; o token CSRF tambem nao deve ficar gravado no log.
+		format filter {
+			wrap json
+			fields {
+				request>headers>X-Csrf-Token delete
+			}
+		}
+	}
+}

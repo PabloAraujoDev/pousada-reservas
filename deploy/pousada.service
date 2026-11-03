@@ -1,0 +1,51 @@
+# /etc/systemd/system/pousada.service
+[Unit]
+Description=Sistema de Reservas - Pousada Boa Esperanca
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pousada
+Group=pousada
+WorkingDirectory=/opt/pousada
+# Variaveis (chave secreta, dominio...). Arquivo root:root 600 - veja deploy/pousada.env.exemplo
+EnvironmentFile=/etc/pousada.env
+ExecStart=/opt/pousada/venv/bin/python app.py servir
+Restart=on-failure
+RestartSec=5
+
+# Pastas gravaveis: /var/lib/pousada (banco, backups, chave), /var/log/pousada (logs)
+StateDirectory=pousada
+StateDirectoryMode=0700
+LogsDirectory=pousada
+LogsDirectoryMode=0750
+UMask=0077
+
+# Hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+SystemCallArchitectures=native
+CapabilityBoundingSet=
+AmbientCapabilities=
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources
+LimitNOFILE=4096
+
+[Install]
+WantedBy=multi-user.target

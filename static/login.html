@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Entrar - Pousada Boa Esperança</title>
+<link rel="icon" href="/static/favicon.ico" sizes="16x16 32x32 48x48">
+<link rel="icon" type="image/png" sizes="192x192" href="/static/icon-192.png">
+<link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<main>
+  <form class="login-caixa" id="formLogin" autocomplete="on">
+    <div class="marca">
+      <img class="logo logo-login" src="/static/logo.png" width="62" height="59" alt="Logo do clube (COPMBM)">
+      <h1>Pousada Boa Esperança</h1>
+    </div>
+    <p class="suave">Sistema de reservas. Entre com seu login e senha.</p>
+    <label class="campo">Login<input type="text" id="login" name="username" autocomplete="username" maxlength="80" required autofocus></label>
+    <label class="campo">Senha<input type="password" id="senha" name="password" autocomplete="current-password" maxlength="200" required></label>
+    <div class="aviso" id="aviso" role="alert" aria-live="polite"></div>
+    <button type="submit" class="primario" id="btnEntrar">Entrar</button>
+  </form>
+</main>
+<script src="/static/login.js"></script>
+</body>
+</html>
