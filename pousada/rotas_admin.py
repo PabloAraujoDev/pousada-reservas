@@ -129,8 +129,13 @@ COLUNAS_RESUMO = ("id", "em", "usuario_login", "acao", "entidade", "entidade_id"
 COLUNAS_RESERVA = ("id", "em", "usuario_login", "acao", "antes", "depois")
 
 
+ACOES_DESPESA = frozenset({"despesa_lancada", "despesa_estornada", "despesas_transferidas", "despesas_recebidas", "diaria_zerada"})
+
+
 def _com_json(linha, colunas):
     d = {c: linha[c] for c in colunas}
+    if "em" in d and linha["acao"] in ACOES_DESPESA and not pode("despesas.hora"):
+        d["em"] = d["em"][:10]            # a hora de um lançamento é dado de auditoria só do administrador
     for campo in ("antes", "depois"):
         if campo in d and d[campo]:
             d[campo] = json.loads(d[campo])

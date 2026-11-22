@@ -159,6 +159,7 @@ def test_contraste_das_telas_novas(navegador, servidor, esquema):
     p.keyboard.press("Escape")
     p.click('#rcCartao [data-rc="despesas"]')
     p.wait_for_selector("#dlgDesp[open]")
+    p.check("#dsAvulso")
     p.fill("#dsDesc", "Cartão 4111 1111 1111 1111")
     p.fill("#dsQtd", "0")
     assert p.evaluate(JS_CONTRASTE, "#dlgDesp") == [], "despesas"
@@ -288,13 +289,12 @@ def test_duplo_clique_lanca_anota_e_estorna_uma_vez_so(navegador, servidor):
     p.click('#rcCartao [data-rc="despesas"]')
     p.wait_for_selector("#dlgDesp[open]")
     p.wait_for_function("() => document.getElementById('dsSituacao').textContent !== ''")
-    p.fill("#dsDesc", "Suco duplo")
-    p.fill("#dsQtd", "1")
-    p.fill("#dsValor", "7,50")
+    p.wait_for_function("() => document.querySelectorAll('#dsItem option').length > 1")
+    p.fill("#dsQtd", "1")             # atendente escolhe o item do catálogo (primeiro: Água com gás)
     p.dblclick("#dsLancar")
     p.wait_for_selector("#dsLista tr")
     p.wait_for_timeout(600)
-    assert p.locator("#dsLista tr", has_text="Suco duplo").count() == 1
+    assert p.locator("#dsLista tr", has_text="Água com gás").count() == 1
     p.click("#dsLista [data-lid]")
     p.fill("#dsMotivo", "lancado em duplicidade")
     p.dblclick("#dsConfirmarEstorno")

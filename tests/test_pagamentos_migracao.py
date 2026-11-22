@@ -40,9 +40,9 @@ def test_migra_14_para_15_sem_perder_nada(banco_v14, tmp_path):
     bk = str(tmp_path / "bk")
     iniciar_banco(banco_v14, REAL, pasta_backup=bk)
     con = conectar(banco_v14)
-    assert con.execute("SELECT MAX(versao) FROM schema_version").fetchone()[0] == 15
+    assert con.execute("SELECT MAX(versao) FROM schema_version").fetchone()[0] == 16
     assert [tuple(r) for r in con.execute("SELECT * FROM reservas ORDER BY id")] == dump
-    assert [tuple(r)[:-1] for r in con.execute("SELECT * FROM despesa_lancamento ORDER BY id")] == [d for d in desp]
+    assert [tuple(r)[:-2] for r in con.execute("SELECT * FROM despesa_lancamento ORDER BY id")] == [d for d in desp]
     assert con.execute("SELECT COUNT(*) FROM despesa_lancamento WHERE transferencia_id IS NOT NULL").fetchone()[0] == 0
     for t in ("pagamento", "transferencia", "conta_evento"):
         assert con.execute("SELECT COUNT(*) FROM %s" % t).fetchone()[0] == 0

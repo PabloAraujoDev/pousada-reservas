@@ -62,7 +62,7 @@ def test_duplo_clique_nota_mesma_chave(app, rid):
 
 
 def test_lancamento_mesma_chave_e_estorno_duplo(app, rid):
-    corpo = {"categoria": "bar", "descricao": "Cerveja", "quantidade": 2, "valor_unit_centavos": 1000, "chave": "abcdefgh-1"}
+    corpo = {"item_id": 1, "item_versao": 1, "quantidade": 2, "chave": "abcdefgh-1"}
     r = paralelo(app, "atendente", 8, lambda c, k: c.post("/api/reservas/%d/despesas" % rid, json=corpo))
     assert {s for s, _ in r} <= {200, 201} and Counter(s for s, _ in r)[201] == 1
     lid = [j for s, j in r if s == 201][0]["id"]

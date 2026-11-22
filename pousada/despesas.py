@@ -53,27 +53,48 @@ def _chave_parece_cartao(chave):
     return d.isdigit() and 13 <= len(d) <= 19 and _luhn(d)
 
 
-def validar_lancamento(corpo):
-    """Corpo do POST -> dict limpo (categoria, descricao, quantidade, valor_unit_centavos, chave). Recusa com Recusa."""
-    if not isinstance(corpo, dict):
-        raise Recusa("Envie os dados em um objeto JSON", 400)
-    if corpo.get("categoria") not in CATEGORIAS_DESPESA:
-        raise Recusa("Categoria inválida")
-    descricao = _texto(corpo.get("descricao"), "a descrição", 2, 80)
-    qtd, unit, chave = corpo.get("quantidade"), corpo.get("valor_unit_centavos"), corpo.get("chave")
+def quantidade_valida(qtd):
     if not _inteiro(qtd) or not 1 <= qtd <= MAX_DESPESA_QTD:
         raise Recusa("Quantidade inválida (use um número inteiro de 1 a %d)" % MAX_DESPESA_QTD)
-    if not _inteiro(unit) or unit < 1:
-        raise Recusa("Valor inválido (informe um valor maior que zero)")
-    if unit > MAX_DESPESA_UNIT:
-        raise Recusa("Valor acima do máximo permitido (%s)" % reais(MAX_DESPESA_UNIT))
+    return qtd
+
+
+def chave_valida(chave):
     if chave is not None and not (isinstance(chave, str) and 8 <= len(chave) <= 64 and chave.isascii()
                                   and chave.replace("-", "").replace("_", "").isalnum()):
         raise Recusa("Chave de envio inválida")
     if chave is not None and _chave_parece_cartao(chave):
         raise Recusa("Chave de envio inválida")           # a chave é gravada: nunca um número de cartão disfarçado
+    return chave
+
+
+def validar_lancamento(corpo):
+    """Lançamento AVULSO (sem item do catálogo; só administrador). Corpo -> dict limpo. Recusa com Recusa."""
+    if not isinstance(corpo, dict):
+        raise Recusa("Envie os dados em um objeto JSON", 400)
+    if corpo.get("categoria") not in CATEGORIAS_DESPESA:
+        raise Recusa("Categoria inválida")
+    descricao = _texto(corpo.get("descricao"), "a descrição", 2, 80)
+    qtd, unit = quantidade_valida(corpo.get("quantidade")), corpo.get("valor_unit_centavos")
+    if not _inteiro(unit) or unit < 1:
+        raise Recusa("Valor inválido (informe um valor maior que zero)")
+    if unit > MAX_DESPESA_UNIT:
+        raise Recusa("Valor acima do máximo permitido (%s)" % reais(MAX_DESPESA_UNIT))
     return {"categoria": corpo["categoria"], "descricao": descricao, "quantidade": qtd,
-            "valor_unit_centavos": unit, "chave": chave}
+            "valor_unit_centavos": unit, "chave": chave_valida(corpo.get("chave")), "item_id": None}
+
+
+def validar_por_item(corpo):
+    """Lançamento POR ITEM: só item_id, item_versao, quantidade e chave. Preço/descrição vindos do cliente são recusados."""
+    if not isinstance(corpo, dict):
+        raise Recusa("Envie os dados em um objeto JSON", 400)
+    if set(corpo) - {"item_id", "item_versao", "quantidade", "chave"}:
+        raise Recusa("Lançamento por item aceita só o item, a quantidade e a chave: o preço vem do catálogo", 400)
+    iid, ver = corpo.get("item_id"), corpo.get("item_versao")
+    if not _inteiro(iid) or iid < 1 or not _inteiro(ver) or ver < 1:
+        raise Recusa("Item inválido", 400)
+    return {"item_id": iid, "item_versao": ver, "quantidade": quantidade_valida(corpo.get("quantidade")),
+            "chave": chave_valida(corpo.get("chave"))}
 
 
 def validar_motivo(corpo):
@@ -100,20 +121,26 @@ def totais(soma_despesas, n_noites, diaria, com_diaria):
     return t
 
 
-def item(linha, estornos):
+def momento(em, com_hora):
+    """'AAAA-MM-DD HH:MM:SS' -> completo só para quem tem despesas.hora (administrador); os demais recebem APENAS a data.
+    A hora é dado de auditoria (conferir câmeras): filtrar AQUI, no servidor, em toda resposta que traga data de lançamento."""
+    return em if com_hora else em[:10]
+
+
+def item(linha, estornos, com_hora=False):
     """Linha do banco -> item da API. 'estornos' = {id_do_lancamento: id_do_estorno}."""
     return {"id": linha["id"], "tipo": linha["tipo"], "categoria": linha["categoria"],
             "descricao": linha["descricao"], "quantidade": linha["quantidade"],
             "valor_unit_centavos": linha["valor_unit_centavos"], "total_centavos": linha["total_centavos"],
-            "em": linha["em"], "por": linha["usuario_login"], "estorno_de": linha["estorno_de"],
+            "em": momento(linha["em"], com_hora), "item_id": linha["item_id"], "por": linha["usuario_login"], "estorno_de": linha["estorno_de"],
             "estornado": linha["id"] in estornos, "estorno_id": estornos.get(linha["id"]),
             "motivo": linha["motivo"]}
 
 
-def itens(linhas):
+def itens(linhas, com_hora=False):
     """Lista de itens, do mais novo para o mais antigo, marcando os lançamentos já estornados."""
     estornos = {l["estorno_de"]: l["id"] for l in linhas if l["estorno_de"]}
-    return [item(l, estornos) for l in sorted(linhas, key=lambda x: -x["id"])]
+    return [item(l, estornos, com_hora) for l in sorted(linhas, key=lambda x: -x["id"])]
 
 
 def conferir_saldo(saldo_atual, total_novo):

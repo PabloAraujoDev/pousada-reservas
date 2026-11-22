@@ -7,7 +7,7 @@ import subprocess
 import pytest
 
 RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-ARQUIVOS = ("despesas_logica.js", "despesas_form.js", "despesas.js")
+ARQUIVOS = ("despesas_logica.js", "despesas_form.js", "despesas.js", "catalogo_logica.js", "catalogo.js", "consumo.js")
 
 
 def _ler(*p):
@@ -16,8 +16,9 @@ def _ler(*p):
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="node não instalado")
-def test_logica_pura_no_node():
-    r = subprocess.run([shutil.which("node"), os.path.join(RAIZ, "tests", "js", "despesas_logica.js")],
+@pytest.mark.parametrize("arquivo", ["despesas_logica.js", "catalogo_logica.js"])
+def test_logica_pura_no_node(arquivo):
+    r = subprocess.run([shutil.which("node"), os.path.join(RAIZ, "tests", "js", arquivo)],
                        capture_output=True, text=True, timeout=60, encoding="utf-8")
     assert r.returncode == 0, r.stdout + r.stderr
 
@@ -32,7 +33,7 @@ def test_sem_estilo_nem_evento_inline_nem_eval(nome):
 def test_html_do_dialogo_e_ordem_dos_scripts():
     html = _ler("static", "index.html")
     for ident in ("dlgDesp", "dsTit", "dsForm", "dsCat", "dsDesc", "dsQtd", "dsValor", "dsLancar", "dsMsg", "dsEstorno",
-                  "dsMotivo", "dsLista", "dsTotais", "dsImprimir", "dsFechar", "dsFechar2"):
+                  "dsMotivo", "dsItem", "dsAvulso", "cgLista", "cnTabela", "dlgCat", "dsLista", "dsTotais", "dsImprimir", "dsFechar", "dsFechar2"):
         assert 'id="%s"' % ident in html
     assert re.search(r'id="dsMsg"[^>]*aria-live="polite"', html)
     ordem = [html.index("/static/" + n) for n in ("operacao_notas.js", "despesas_logica.js", "despesas_form.js", "despesas.js")]
@@ -52,3 +53,11 @@ def test_arquivos_da_lista_continuam_sem_valor():
         js = _ler("static", nome).lower()
         for proibido in ("centavos", "valores.ver", "r$"):
             assert proibido not in js, (nome, proibido)
+
+
+def test_aba_do_administrador_e_so_dele():
+    html = _ler("static", "index.html")
+    assert re.search(r'<button data-aba="despesas" data-cap="catalogo.gerir"', html) and 'id="aba-despesas"' in html
+    assert html.index("/static/catalogo_logica.js") < html.index("/static/catalogo.js") < html.index("/static/consumo.js")
+    css = _ler("static", "app.css")
+    assert "body.imp-consumo" in css and "body.imp-extrato #dlgDesp .ds-hora{display:none" in css

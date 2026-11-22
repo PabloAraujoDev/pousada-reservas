@@ -59,7 +59,7 @@ def test_013_para_015_direto_preserva_tudo_e_e_idempotente(banco_v13, tmp_path):
     iniciar_banco(banco_v13, REAL, pasta_backup=bk)                    # segunda subida: nada a fazer, nem novo backup
     assert len(os.listdir(bk)) == 1 and _foto(banco_v13) == (antes, desp)
     con = conectar(banco_v13)
-    assert [r[0] for r in con.execute("SELECT versao FROM schema_version ORDER BY 1")] == list(range(1, 16))
+    assert [r[0] for r in con.execute("SELECT versao FROM schema_version ORDER BY 1")] == list(range(1, 17))
     assert con.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
     con.close()
 

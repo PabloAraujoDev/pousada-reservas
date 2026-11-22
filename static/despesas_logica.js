@@ -53,10 +53,32 @@ function dsNovaChave(){
   if (c && c.getRandomValues) c.getRandomValues(b); else for (var i = 0; i < 16; i++) b[i] = Math.floor(Math.random() * 256);
   return Array.prototype.map.call(b, function(x){ return (x < 16 ? "0" : "") + x.toString(16); }).join("");
 }
-/* "2026-10-29 09:05:00" -> "29/10 09:05" */
+/* "2026-10-29 09:05:00" -> "29/10 09:05"; só a data ("2026-10-29", o que os perfis sem despesas.hora recebem) -> "29/10". */
 function dsDataHora(em){
-  var m = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})/.exec(String(em || ""));
-  return m ? m[3] + "/" + m[2] + " " + m[4] + ":" + m[5] : String(em || "");
+  var m = /^(\d{4})-(\d{2})-(\d{2})(?: (\d{2}):(\d{2}))?/.exec(String(em || ""));
+  return m ? m[3] + "/" + m[2] + (m[4] ? " " + m[4] + ":" + m[5] : "") : String(em || "");
+}
+/* Separa data e hora exata: {data: "29/10", hora: "09:05:12"}; hora vazia quando o servidor só mandou a data. */
+function dsQuando(em){
+  var m = /^(\d{4})-(\d{2})-(\d{2})(?: (\d{2}:\d{2}:\d{2}))?/.exec(String(em || ""));
+  return m ? {data: m[3] + "/" + m[2], hora: m[4] || ""} : {data: String(em || ""), hora: ""};
+}
+/* Confere o lançamento POR ITEM do catálogo; o preço vem do item (o servidor confere a versão). {erro} ou {dados, total}. */
+function dsConferirPorItem(item, qtdTexto){
+  var qtd = dsParseQuantidade(qtdTexto);
+  if (!item) return {erro: "Escolha o item."};
+  if (qtd === null) return {erro: "A quantidade deve ser um número inteiro de 1 a " + DS_MAX_QTD + "."};
+  return {dados: {item_id: item.id, item_versao: item.versao, quantidade: qtd}, total: qtd * item.preco_centavos};
+}
+/* Itens (já em ordem alfabética, vindos do servidor) -> grupos [{rotulo, itens}] para o seletor. */
+function dsAgruparItens(itens){
+  var grupos = [], ult = null;
+  itens.forEach(function(i){
+    var rot = i.categoria_rotulo + (i.grupo ? " - " + i.grupo : "");
+    if (!ult || ult.rotulo !== rot){ ult = {rotulo: rot, itens: []}; grupos.push(ult); }
+    ult.itens.push(i);
+  });
+  return grupos;
 }
 function dsRotuloCategoria(cat){
   var r = DS_CATEGORIAS.filter(function(c){ return c[0] === cat; })[0];
@@ -85,7 +107,7 @@ function dsDescricaoLancado(dados){ return "Lançado: " + dados.quantidade + " x
 
 if (typeof module !== "undefined" && module.exports){
   module.exports = {dsParseReais: dsParseReais, dsFormatarReais: dsFormatarReais, dsParseQuantidade: dsParseQuantidade,
-    dsConferirFormulario: dsConferirFormulario, dsConferirMotivo: dsConferirMotivo, dsNovaChave: dsNovaChave, dsDataHora: dsDataHora,
+    dsConferirFormulario: dsConferirFormulario, dsConferirMotivo: dsConferirMotivo, dsNovaChave: dsNovaChave, dsDataHora: dsDataHora, dsQuando: dsQuando, dsConferirPorItem: dsConferirPorItem, dsAgruparItens: dsAgruparItens,
     dsRotuloCategoria: dsRotuloCategoria, dsSituacaoLinha: dsSituacaoLinha, dsMensagemErro: dsMensagemErro,
     dsLinhasTotais: dsLinhasTotais, dsDescricaoLancado: dsDescricaoLancado, DS_CATEGORIAS: DS_CATEGORIAS};
 }

@@ -10,6 +10,14 @@ function dsCelula(tr, rotulo, texto, classe){
   tr.appendChild(td);
   return td;
 }
+/* Data para todos; a hora exata (HH:MM:SS) só chega do servidor para quem tem despesas.hora e some do extrato impresso (.ds-hora). */
+function dsCelulaQuando(tr, em){
+  var q = dsQuando(em), td = dsCelula(tr, "Data", q.data);
+  if (!pode("despesas.hora")) return;
+  var h = document.createElement("span");
+  h.className = "ds-hora"; h.textContent = " " + (q.hora || "-");
+  td.appendChild(h);
+}
 function dsTextoSituacao(it, porId){
   if (it.tipo === "estorno") return "Estorno do lançamento nº " + it.estorno_de + ". Motivo: " + it.motivo;
   if (!it.estornado) return "";
@@ -26,7 +34,7 @@ function dsBotaoEstornar(it){
 function dsLinha(it, porId){
   var tr = document.createElement("tr"), sit = dsSituacaoLinha(it);
   tr.className = "ds-linha ds-s-" + sit;
-  dsCelula(tr, "Data", dsDataHora(it.em));
+  dsCelulaQuando(tr, it.em);
   dsCelula(tr, "Categoria", dsRotuloCategoria(it.categoria));
   dsCelula(tr, "Descrição", (it.tipo === "estorno" ? "Estorno: " : "") + it.descricao, "ds-desc");
   dsCelula(tr, "Qtd", String(it.quantidade), "ds-num");
@@ -86,7 +94,7 @@ function dsFecharEstorno(devolverFoco){
   ds.estornando = null;
   $("dsEstorno").classList.add("oculto");
   var b = lid && document.querySelector('#dsLista [data-lid="' + lid + '"]');
-  if (devolverFoco !== false) (b || $("dsDesc")).focus();
+  if (devolverFoco !== false) (b || $("dsItem")).focus();
 }
 function dsConfirmarEstorno(){
   var m = dsConferirMotivo($("dsMotivo").value);
@@ -97,7 +105,7 @@ function dsConfirmarEstorno(){
     if (!r.ok){ dsMensagem(dsMensagemErro(r.status, r.dados.erro, "estornar"), true); return dsAtualizar(); }
     dsMensagem("Lançamento cancelado por estorno."); ds.mudou = true;
     dsFecharEstorno(false);
-    return dsAtualizar().then(function(){ $("dsDesc").focus(); });
+    return dsAtualizar().then(function(){ $("dsItem").focus(); });
   }).catch(function(){ dsMensagem("Sem conexão com o servidor. Confira a conta antes de tentar de novo.", true); })
     .then(function(){ ds.enviando = false; $("dsConfirmarEstorno").disabled = false; });
 }
@@ -135,7 +143,7 @@ function odAbrirDespesas(b){
     $("dsEstorno").classList.add("oculto");
     dsAplicar(resp.dados);
     $("dlgDesp").showModal();
-    (pode("despesas.lancar") ? $("dsDesc") : $("dsTit")).focus();
+    (pode("despesas.lancar") ? $("dsItem") : $("dsTit")).focus();
     dsIniciarAtualizacao();
   }).catch(function(){ aviso("Sem conexão com o servidor."); odOrigem = null; });
 }

@@ -82,6 +82,25 @@ caso("totais: com diária, sem diária, sem permissão de valores", () => {
 caso("mensagem de lançado", () => {
   assert.strictEqual(D.dsDescricaoLancado({quantidade: 2, descricao: "Água", valor_unit_centavos: 800}), "Lançado: 2 x Água R$ 8,00.");
 });
+caso("data/hora: admin recebe a hora, os outros só a data", () => {
+  assert.strictEqual(D.dsDataHora("2026-10-29"), "29/10");
+  assert.deepStrictEqual(D.dsQuando("2026-10-29 09:05:33"), {data: "29/10", hora: "09:05:33"});
+  assert.deepStrictEqual(D.dsQuando("2026-10-29"), {data: "29/10", hora: ""});
+});
+caso("lançamento por item: o total vem do preço do item", () => {
+  const item = {id: 3, versao: 2, preco_centavos: 1500};
+  const r = D.dsConferirPorItem(item, "3");
+  assert.deepStrictEqual(r.dados, {item_id: 3, item_versao: 2, quantidade: 3});
+  assert.strictEqual(r.total, 4500);
+  assert.ok(D.dsConferirPorItem(null, "1").erro);
+  for (const q of ["0", "100", "1,5", "", "a"]) assert.ok(D.dsConferirPorItem(item, q).erro, q);
+  assert.ok(!("valor_unit_centavos" in r.dados) && !("descricao" in r.dados));
+});
+caso("agrupa itens por categoria e grupo mantendo a ordem do servidor", () => {
+  const g = D.dsAgruparItens([{categoria_rotulo: "Bebidas", grupo: "Águas"}, {categoria_rotulo: "Bebidas", grupo: "Águas"},
+    {categoria_rotulo: "Bebidas", grupo: "Sucos"}, {categoria_rotulo: "Porções", grupo: ""}]);
+  assert.deepStrictEqual(g.map(x => [x.rotulo, x.itens.length]), [["Bebidas - Águas", 2], ["Bebidas - Sucos", 1], ["Porções", 1]]);
+});
 
 let falhas = 0;
 casos.forEach(([n, f]) => { try { f(); } catch (e) { falhas++; console.error("FALHOU: " + n + "\n  " + e.message); } });

@@ -157,7 +157,7 @@ input.feito:checked::after{content:"\2713";position:absolute;inset:0;text-align:
   html,body{background:#fff!important;color:#000!important;font-size:10pt}
   header,.nao-imprimir,#toast,dialog,.legenda{display:none!important}
   .aba,.aba.ativa{display:none!important}
-  body:not(.imp-folha):not(.imp-calendario):not(.imp-governanca):not(.imp-resumo):not(.imp-extrato):not(.imp-ocupacao):not(.imp-fnrh):not(.imp-rcextrato) #aba-camareiras{display:block!important}
+  body:not(.imp-consumo):not(.imp-folha):not(.imp-calendario):not(.imp-governanca):not(.imp-resumo):not(.imp-extrato):not(.imp-ocupacao):not(.imp-fnrh):not(.imp-rcextrato) #aba-camareiras{display:block!important}
   body.imp-folha #aba-folha{display:block!important}
   body.imp-folha .so-impressao{display:block;font-size:14pt;font-weight:700;margin:0 0 5pt}
   body.imp-folha .tabela-wrap{overflow:visible;border:0}
@@ -1009,4 +1009,36 @@ h3.rc-apto-nome{margin:0}
   .ex-emitido{margin:10pt 0 0;font-size:8.5pt}
   .ex-ass{display:flex;gap:40pt;margin-top:30pt;break-inside:avoid}
   .ex-ass span{flex:1;border-top:.7pt solid #000;padding-top:2pt;text-align:center;font-size:9pt}
+}
+
+/* ---- Catálogo de itens e relatório de consumo (aba Despesas do administrador) ---- */
+.ds-form .oculto,.ds-hora.oculto{display:none!important}
+.ds-f-item{grid-column:span 2}
+.ds-f-modo{grid-column:1 / -1;flex-direction:row!important;align-items:center;gap:8px!important}
+.cg-inativos{display:inline-flex;align-items:center;gap:6px}
+.cg-inativo{color:var(--suave)}
+.cg-form{display:grid;gap:10px;margin:0 0 10px}
+.cg-form label{display:flex;flex-direction:column;gap:3px;font-size:.85rem;color:var(--suave)}
+.cg-form input,.cg-form select{min-height:44px;font-size:1rem}
+.cn-imp-cab,.cn-total{margin:6px 0}
+.cn-imp-cab{display:none}
+#cnTabela.oculto{display:none!important}
+@media (max-width:700px){.ds-f-item{grid-column:1 / -1}}
+@media print{
+  body.imp-consumo{page:auto}
+  body.imp-consumo #aba-despesas{display:block!important}
+  body.imp-consumo #aba-despesas>*:not(.cn-imp-cab):not(.tabela-wrap):not(.cn-total){display:none!important}
+  body.imp-consumo #aba-despesas>.cg-wrap{display:none!important}
+  body.imp-consumo .cn-imp-cab{display:block;font-weight:700;font-size:11pt}
+  body.imp-consumo .tabela-wrap{overflow:visible;border:0}
+  body.imp-consumo #cnTabela{width:100%;border-collapse:collapse;font-size:8.5pt;color:#000}
+  body.imp-consumo #cnTabela th{background:#ddd!important;color:#000!important;border:1pt solid #000;padding:2pt 4pt;text-align:left}
+  body.imp-consumo #cnTabela td{border:1pt solid #000;padding:2pt 4pt;color:#000}
+  body.imp-consumo #cnTabela tr{break-inside:avoid}
+  body.imp-extrato #dlgDesp .ds-hora{display:none!important}     /* o extrato entregue ao hóspede nunca leva a hora */
+}
+@media (max-width:1500px) and (min-width:1001px){      /* administrador: 16 menus cabem em uma linha em 1366px */
+  nav{gap:2px}
+  header nav button{padding:5px 4px;font-size:.72rem}
+  header .marca h1{font-size:1rem}
 }

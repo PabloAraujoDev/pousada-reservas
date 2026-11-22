@@ -1,6 +1,7 @@
 """Regras de negócio: unidades, validação de datas, conflitos, café e hóspedes."""
 import re
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from .cartao import MSG_CARTAO, contem_numero_cartao  # noqa: F401  (reexportados: regras é o ponto único)
 
@@ -12,8 +13,16 @@ OCUPADAS = {"104"}  # unidades que não aceitam reserva
 PAGAMENTOS = ("pago", "parcial", "pousada", "gratis", "pendente")
 
 
+FUSO = ZoneInfo("America/Sao_Paulo")
+
+
+def agora_local():
+    """Hora da pousada (America/Sao_Paulo), sem fuso e sem microssegundos, não importa o fuso do servidor."""
+    return datetime.now(FUSO).replace(tzinfo=None, microsecond=0)
+
+
 def agora():
-    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    return agora_local().strftime("%Y-%m-%d %H:%M:%S")
 
 
 def data_valida(texto):

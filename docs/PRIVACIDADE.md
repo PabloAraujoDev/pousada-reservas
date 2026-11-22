@@ -144,6 +144,19 @@ Inventário dos dados do módulo Governança (tabelas `governanca_unidade` e `go
 - **Eliminação:** reserva com pagamento, transferência ou lançamento não pode ser excluída (cancela-se, depois de estornar os pagamentos); o valor da
   diária zerada é guardado em `conta_evento` para rastro. Prazo de guarda dos registros financeiros: **[DECISÃO DO CLUBE]** (obrigação fiscal/contábil).
 
+## 2.6 Hora do lançamento de despesa (dado de auditoria)
+
+A data e a **hora exata** (segundos, fuso America/Sao_Paulo) de cada lançamento ou estorno de despesa existem para conferir as câmeras se o
+hóspede contestar. É dado de auditoria **só do administrador** (`despesas.hora`): o servidor entrega aos demais perfis (recepção, atendente,
+camareira, diretoria, consulta) apenas a data, em todas as rotas (conta da reserva, Info, histórico geral e da reserva); não basta esconder na
+tela. O extrato impresso para o hóspede não traz a hora. A hora é gravada pelo servidor (nunca pelo navegador) e o registro é imutável.
+O relatório de consumo (com hora, apartamento, hóspede e quem lançou) é restrito ao administrador. O catálogo de itens não guarda dado pessoal;
+suas alterações ficam em log imutável (quem, quando, IP, antes e depois). Base legal sugerida: legítimo interesse/exercício regular de direitos
+(contestação de cobrança); prazo de retenção a definir pelo clube.
+
+**Limite conhecido (aceito):** a lista da Info (`/lancamentos`) ordena despesas e pagamentos pela hora completa e mostra a hora só dos pagamentos;
+quem vê a conta consegue deduzir uma faixa de horário de um lançamento pela posição entre dois pagamentos. Não revela a hora exata.
+
 ## 3. Medidas de proteção em vigor
 
 - Acesso só com login e senha (senhas guardadas como hash, nunca em texto), bloqueio contra tentativas repetidas e sessão com prazo.

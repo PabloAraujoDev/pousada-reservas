@@ -40,6 +40,8 @@ TODAS = frozenset({
     "pagamentos.estornar",          # estornar um pagamento (linha negativa, com motivo)
     "despesas.transferir",          # transferir despesas (e a diária) para outra hospedagem; zerar a diária informada
     "conta.reabrir",                # reabrir uma conta fechada (com motivo)
+    "catalogo.gerir",               # catálogo de itens de consumo (aba Despesas do administrador): cadastrar, editar, desativar; lançamento avulso
+    "despesas.hora",                # ver a HORA exata dos lançamentos e o relatório de consumo (auditoria; só administrador)
     "veiculo.editar",               # placa do veículo (dado pessoal); ver sem máscara
 })
 

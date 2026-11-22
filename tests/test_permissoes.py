@@ -52,7 +52,7 @@ ROTAS = [
     ("despesas: ver", "get", "/api/reservas/1/despesas", None, {"admin", "atendente", "recepcao", "diretoria"}),
     ("despesas: resumo de contas abertas", "get", "/api/despesas/resumo", None, {"admin", "atendente", "recepcao", "diretoria"}),
     ("despesas: lançar", "post", "/api/reservas/1/despesas",
-     {"categoria": "bar", "descricao": "Agua", "quantidade": 1, "valor_unit_centavos": 500, "chave": "chave-perm-1"},
+     {"item_id": 1, "item_versao": 1, "quantidade": 1, "chave": "chave-perm-1"},
      {"admin", "atendente", "recepcao"}),
     ("despesas: estornar", "post", "/api/despesas/1/estorno", {"motivo": "digitado errado"}, {"admin", "atendente"}),
     ("listar usuários", "get", "/api/usuarios", None, SO_ADMIN),

@@ -318,6 +318,7 @@ def test_despesas_do_resumo_abre_o_dialogo_e_atualiza_o_total(admin):
     assert "Lançamentos" in p.inner_text("#rcCartao")
     p.click('#rcCartao [data-rc="despesas"]')
     p.wait_for_selector("#dlgDesp[open]")
+    p.check("#dsAvulso")
     p.fill("#dsDesc", "Suco de laranja")
     p.fill("#dsValor", "12,50")
     p.click("#dsLancar")

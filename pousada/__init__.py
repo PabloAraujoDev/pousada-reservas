@@ -75,7 +75,7 @@ def create_app(caminho_banco=None, config=None):
     _iniciar_banco_com_backup(app)
 
     from . import (rotas, rotas_admin, rotas_auth, rotas_despesas, rotas_governanca, rotas_hospedagem, rotas_hospedes,
-                   rotas_importacao, rotas_notas, rotas_pagamentos, rotas_transferencia, rotas_lancamentos)
+                   rotas_importacao, rotas_notas, rotas_pagamentos, rotas_transferencia, rotas_lancamentos, rotas_catalogo)
     from .db import fechar_con
     from .erros import registrar_erros
     from .seguranca import iniciar_seguranca, configurar_logs
@@ -84,6 +84,6 @@ def create_app(caminho_banco=None, config=None):
     iniciar_seguranca(app)
     app.teardown_appcontext(fechar_con)
     for modulo in (rotas, rotas_auth, rotas_admin, rotas_importacao, rotas_governanca, rotas_despesas, rotas_notas,
-                   rotas_hospedes, rotas_hospedagem, rotas_pagamentos, rotas_transferencia, rotas_lancamentos):
+                   rotas_hospedes, rotas_hospedagem, rotas_pagamentos, rotas_transferencia, rotas_lancamentos, rotas_catalogo):
         app.register_blueprint(modulo.bp)
     return app

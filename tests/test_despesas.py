@@ -39,18 +39,18 @@ def lancar(c, rid, **extra):
 
 def test_lancar_e_listar_soma(app):
     rid = nova_reserva(app)["id"]
-    r = lancar(cli(app, "atendente"), rid)
+    r = lancar(cli(app, "admin"), rid)
     assert r.status_code == 201
     it = r.get_json()
-    assert it["total_centavos"] == 1600 and it["por"] == "atendente" and it["em"] == "2026-10-29 09:00:00"
-    g = cli(app, "atendente").get("/api/reservas/%d/despesas" % rid).get_json()
+    assert it["total_centavos"] == 1600 and it["por"] == "admin" and it["em"] == "2026-10-29 09:00:00"
+    g = cli(app, "admin").get("/api/reservas/%d/despesas" % rid).get_json()
     assert g["totais"]["despesas_centavos"] == 1600 and len(g["itens"]) == 1
     assert g["conta"] == {"situacao": "aberta", "quitacao": "pendente", "versao": 2, "fechada_em": None, "quitada_em": None}
 
 
 def test_mesma_chave_devolve_o_original(app):
     rid = nova_reserva(app)["id"]
-    c = cli(app, "atendente")
+    c = cli(app, "admin")
     a, b = lancar(c, rid), lancar(c, rid)
     assert (a.status_code, b.status_code) == (201, 200) and a.get_json()["id"] == b.get_json()["id"]
     assert len(c.get("/api/reservas/%d/despesas" % rid).get_json()["itens"]) == 1
@@ -65,33 +65,33 @@ def test_mesma_chave_devolve_o_original(app):
 ])
 def test_validacoes_422(app, campo, valor):
     rid = nova_reserva(app)["id"]
-    r = lancar(cli(app, "atendente"), rid, **{campo: valor})
+    r = lancar(cli(app, "admin"), rid, **{campo: valor})
     assert r.status_code == 422, r.get_data(as_text=True)
     assert "4111" not in r.get_data(as_text=True)
 
 
 def test_limite_de_valor_tem_mensagem_em_reais(app):
     rid = nova_reserva(app)["id"]
-    r = lancar(cli(app, "atendente"), rid, valor_unit_centavos=1000001)
+    r = lancar(cli(app, "admin"), rid, valor_unit_centavos=1000001)
     assert "R$ 10.000,00" in r.get_json()["erro"]
-    assert lancar(cli(app, "atendente"), rid, valor_unit_centavos=1000000, quantidade=99, chave=None).status_code == 201
+    assert lancar(cli(app, "admin"), rid, valor_unit_centavos=1000000, quantidade=99, chave=None).status_code == 201
 
 
 def test_corpo_que_nao_e_objeto_400(app):
     rid = nova_reserva(app)["id"]
-    assert cli(app, "atendente").post("/api/reservas/%d/despesas" % rid, json=[1]).status_code == 400
+    assert cli(app, "admin").post("/api/reservas/%d/despesas" % rid, json=[1]).status_code == 400
 
 
 def test_xss_na_descricao_e_guardado_como_texto(app):
     rid = nova_reserva(app)["id"]
     d = "<img src=x onerror=alert(1)>"
-    assert lancar(cli(app, "atendente"), rid, descricao=d).status_code == 201
-    assert cli(app, "atendente").get("/api/reservas/%d/despesas" % rid).get_json()["itens"][0]["descricao"] == d
+    assert lancar(cli(app, "admin"), rid, descricao=d).status_code == 201
+    assert cli(app, "admin").get("/api/reservas/%d/despesas" % rid).get_json()["itens"][0]["descricao"] == d
 
 
 def test_estorno_fluxo(app):
     rid = nova_reserva(app)["id"]
-    adm = cli(app, "atendente")
+    adm = cli(app, "admin")
     lid = lancar(adm, rid).get_json()["id"]
     assert adm.post("/api/despesas/%d/estorno" % lid, json={"motivo": "erro"}).status_code == 422
     r = adm.post("/api/despesas/%d/estorno" % lid, json={"motivo": "digitado errado"})
@@ -107,7 +107,7 @@ def test_estorno_fluxo(app):
 
 def test_motivo_do_estorno_recusa_cartao_sem_repetir(app):
     rid = nova_reserva(app)["id"]
-    adm = cli(app, "atendente")
+    adm = cli(app, "admin")
     lid = lancar(adm, rid).get_json()["id"]
     r = adm.post("/api/despesas/%d/estorno" % lid, json={"motivo": "pagou 4111-1111-1111-1111"})
     assert r.status_code == 422 and "4111" not in r.get_data(as_text=True)
@@ -137,16 +137,16 @@ def test_diretoria_ve_despesas_e_diaria_consulta_nada(app):
 
 def test_reserva_futura_e_inexistente(app):
     futura = nova_reserva(app, a="202", i="2026-11-05", f="2026-11-07")["id"]
-    r = lancar(cli(app, "atendente"), futura)
+    r = lancar(cli(app, "admin"), futura)
     assert r.status_code == 422 and "ainda não começou" in r.get_json()["erro"]
-    assert lancar(cli(app, "atendente"), 9999).status_code == 404
-    assert cli(app, "atendente").get("/api/reservas/9999/despesas").status_code == 404
+    assert lancar(cli(app, "admin"), 9999).status_code == 404
+    assert cli(app, "admin").get("/api/reservas/9999/despesas").status_code == 404
 
 
 def test_cancelar_com_saldo_409_e_depois_do_estorno_200(app):
     r0 = nova_reserva(app)
     rid = r0["id"]
-    adm = cli(app, "atendente")
+    adm = cli(app, "admin")
     lid = lancar(adm, rid).get_json()["id"]
     cancela = lambda: adm.delete("/api/reservas/%d" % rid, json={"versao": r0["versao"], "motivo": "desistiu"})
     assert cancela().status_code == 409

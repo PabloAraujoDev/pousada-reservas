@@ -70,4 +70,8 @@ def listar(rid):
     _reserva(con, rid)
     linhas = _despesas(con, rid) + _eventos(con, rid) + (_pagamentos(con, rid) if pode("pagamentos.ver") else [])
     linhas.sort(key=lambda x: (x["em"], _ORDEM[x["origem"]], x["id"]))
+    if not pode("despesas.hora"):      # a hora dos lançamentos (e das transferências que os criam) é só do administrador; a ordem já está certa
+        for x in linhas:
+            if x["origem"] == "despesa" or x["grupo"] == "transferencia":
+                x["em"] = x["em"][:10]
     return jsonify({"itens": linhas, "grupos": list(GRUPOS)})

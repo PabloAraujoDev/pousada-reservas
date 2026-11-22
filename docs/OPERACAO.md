@@ -54,7 +54,7 @@ Parte 1 da especificação "Operação do dia". O que está pronto, o que foi de
 6. Limpeza dos números de cartão já gravados: rodar `python app.py varrer-cartoes` no servidor e corrigir à mão o que for listado.
 7. Despesas (Parte 2A, pronto): cardápio/produtos com preço sugerido (hoje digitação livre), taxa de serviço (não existe), forma de
    cobrança/quitação (a conta não vira `p = pago`), prazo máximo para lançar após a saída, se a recepção pode estornar.
-8. O servidor está em UTC: ajustar para America/Sao_Paulo antes de ligar Despesas (data/hora dos lançamentos).
+8. Fuso: a partir da migração 016 o sistema usa America/Sao_Paulo explicitamente (pacote `tzdata` em requirements.txt), seja qual for o fuso do servidor. Instalar `tzdata` na VPS antes de publicar (`pip install -r requirements.txt`).
 
 ## 5. Despesas (Parte 2A): o que existe e o que a Parte 2B encontra pronto
 
@@ -230,3 +230,35 @@ Parte 1 da especificação "Operação do dia". O que está pronto, o que foi de
   (conta de caixa simples e fechamento de turno ficam como pendência; nada foi implementado); (2) a recepção estorna pagamento, transfere ou reabre conta?
   (hoje não); (3) conciliação com a maquineta/Pix e emissão fiscal; (4) lista de bandeiras, limite de parcelas e parcela mínima; (5) devolução quando o
   hóspede pagou a mais; (6) pagamento antecipado de hospedagem futura (hoje bloqueado); (7) categoria própria "diária" no destino (hoje "outros").
+
+## 11. Catálogo de itens de consumo, lançamento por item e hora do lançamento (migração 016)
+
+- **Catálogo** (tabela `catalogo_item`): categoria (Bebidas, Porções, Lavanderia, Outros), grupo opcional (ex.: "Cervejas Long Neck"),
+  descrição, preço em centavos, ativo, `versao` (bloqueio otimista). Itens **nunca são apagados** (trigger): só desativados/reativados.
+  Cada alteração grava uma linha em `catalogo_log` (imutável por trigger): quem, quando, IP, antes e depois. Ordem alfabética sem
+  considerar acento (categoria, grupo, descrição), a mesma na tela do lançamento e na do administrador.
+- **Carga inicial**: 28 itens (16 Bebidas, 12 Porções) na própria migração, com os preços do pedido. Categoria do lançamento: Bebidas = bar,
+  Porções = restaurante (as 4 categorias antigas de `despesa_lancamento` continuam valendo).
+- **Quem faz o quê**: `catalogo.gerir` (só administrador) cadastra/edita/desativa e vê a aba **Despesas**; quem já lança (`despesas.lancar`:
+  administrador, atendente, recepção) **só escolhe item e quantidade** e vê o catálogo ativo com preços, sem editar.
+  O lançamento **avulso** (descrição e valor digitados) ficou só para o administrador (marcar "Lançamento avulso" no formulário); recepção e
+  atendente recebem 403. `POST /api/reservas/<id>/despesas` por item aceita só `item_id`, `item_versao`, `quantidade`, `chave`
+  (qualquer campo de preço/descrição é recusado). Se o preço mudou desde que a tela abriu (versão diferente) ou o item foi desativado: 409
+  e a lista é recarregada.
+- **Congelamento**: descrição e preço unitário são copiados para o lançamento; mudar o preço depois não altera o histórico. Estorno,
+  transferência, fechamento e a regra de ouro (total da conta nunca abaixo dos pagamentos líquidos) seguem iguais e valem para os dois tipos.
+  `despesa_lancamento.item_id` é NULL nos lançamentos antigos e nos avulsos.
+- **Hora exata**: `despesa_lancamento.em` (AAAA-MM-DD HH:MM:SS, `NOT NULL`, fuso America/Sao_Paulo) já existia desde a migração 012 e todos
+  os lançamentos antigos TÊM hora (nenhum fica "hora desconhecida"; o "-" só aparece se o servidor não mandar a hora). A migração 016 acrescenta
+  um trigger que recusa `em` vazio ou fora do formato. A hora vem sempre do servidor, nunca do cliente.
+- **Só o administrador vê a hora** (`despesas.hora`): filtrada NO SERVIDOR em `GET /api/reservas/<id>/despesas`, na resposta do lançar/estornar,
+  em `/api/reservas/<id>/lancamentos` (Info), no histórico geral e no da reserva (ações de despesa e transferência). Os demais perfis
+  recebem apenas a data. Testes: `tests/test_despesas_hora.py` (6 perfis x rotas). O extrato A4 entregue ao hóspede **não imprime a hora**
+  mesmo quando o administrador o emite (classe `.ds-hora` escondida em `body.imp-extrato`): decisão do clube se isso deve mudar.
+- **Relatório de consumo** (aba Despesas, só administrador): `GET /api/relatorio/consumo?inicio=&fim=` (máx. 93 dias, 3000 linhas) com data e
+  hora, apartamento, hóspede, item, quantidade, unitário, total, quem lançou e observação (estorno/transferência/avulso). Imprime em A4
+  paisagem (`body.imp-consumo`), marcado como uso interno.
+- **Decisões que dependem do clube**: (1) manter o avulso só para o administrador? (2) o extrato do hóspede deve mostrar a hora? (3) prazo de
+  guarda da hora (câmeras costumam guardar poucos dias; o registro de despesas não é apagado); (4) itens de Lavanderia/Outros ainda não
+  têm carga inicial; (5) a hora do histórico geral (`historico.em`) ainda usa o relógio do servidor por `regras.agora()` (agora também em Sao_Paulo).
+

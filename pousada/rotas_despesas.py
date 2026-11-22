@@ -8,12 +8,13 @@ import sqlite3
 
 from flask import Blueprint, jsonify, request
 
+from . import catalogo as cat
 from . import despesas as desp
 from . import pagamentos as pg
 from .db import obter_con, transacao
 from .erros import ErroApi
 from .historico import ator_atual, registrar
-from .permissoes import exige, pode
+from .permissoes import exige, exigir, pode
 from .regras import MAX_LANCAMENTOS
 from .rotas_governanca import agora
 from .rotas_hospedagem import contas_abertas
@@ -48,14 +49,14 @@ def _corpo_totais(con, r):
 def listar(rid):
     con = obter_con()
     r = _reserva(con, rid)
-    return jsonify({"conta": desp.conta(con, rid), "itens": desp.itens(desp.linhas_da_reserva(con, rid)),
+    return jsonify({"conta": desp.conta(con, rid), "itens": desp.itens(desp.linhas_da_reserva(con, rid), pode("despesas.hora")),
                     "totais": _corpo_totais(con, r), "reserva": {"a": r["a"], "i": r["i"], "f": r["f"], "status": r["status"]}})
 
 
 def _item_por_id(con, lid):
     linhas = desp.linhas_da_reserva(con, con.execute("SELECT reserva_id FROM despesa_lancamento WHERE id=?",
                                                      (lid,)).fetchone()[0])
-    return next(i for i in desp.itens(linhas) if i["id"] == lid)
+    return next(i for i in desp.itens(linhas, pode("despesas.hora")) if i["id"] == lid)
 
 
 def _conferir_pode_lancar(con, r, conta):
@@ -68,16 +69,29 @@ def _conferir_pode_lancar(con, r, conta):
         raise ErroApi(MSG_FECHADA, 409)
 
 
+def _dados_do_item(con, d):
+    """Congela descrição e preço do item no lançamento. Item desativado ou com preço mudado desde que a tela abriu é recusado."""
+    it = cat.obter(con, d["item_id"])
+    if it is None:
+        raise ErroApi("Item não encontrado", 404)
+    if not it["ativo"]:
+        raise ErroApi("Este item foi desativado. Atualize a lista de itens.", 409)
+    if it["versao"] != d["item_versao"]:
+        raise ErroApi("O item foi alterado (preço ou nome). Atualize a lista de itens e confira o valor.", 409)
+    return {"categoria": cat.CATEGORIAS[it["categoria"]][1], "descricao": it["descricao"], "quantidade": d["quantidade"],
+            "valor_unit_centavos": it["preco_centavos"], "chave": d["chave"], "item_id": it["id"]}
+
+
 def gravar(con, rid, r, dados, tipo, momento, estorno_de=None, motivo="", transferencia_id=None):
     """Acrescenta a linha ao log, cria a conta se preciso e soma 1 na versão da conta (mesma transação)."""
     a = ator_atual()
     total = dados["quantidade"] * dados["valor_unit_centavos"]
     cur = con.execute(
         "INSERT INTO despesa_lancamento (reserva_id,tipo,categoria,descricao,quantidade,valor_unit_centavos,total_centavos,"
-        "apto,em,usuario_id,usuario_login,chave,estorno_de,motivo,ip,transferencia_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "apto,em,usuario_id,usuario_login,chave,estorno_de,motivo,ip,transferencia_id,item_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (rid, tipo, dados["categoria"], dados["descricao"], dados["quantidade"], dados["valor_unit_centavos"],
          total if tipo == "lancamento" else -total, r["a"], momento.strftime("%Y-%m-%d %H:%M:%S"),
-         a["id"], a["login"], dados.get("chave"), estorno_de, motivo, a["ip"], transferencia_id))
+         a["id"], a["login"], dados.get("chave"), estorno_de, motivo, a["ip"], transferencia_id, dados.get("item_id")))
     con.execute("INSERT OR IGNORE INTO despesa_conta (reserva_id) VALUES (?)", (rid,))
     con.execute("UPDATE despesa_conta SET versao = versao + 1 WHERE reserva_id=?", (rid,))
     registrar(con, "despesa_lancada" if tipo == "lancamento" else "despesa_estornada", "reserva", rid, None,
@@ -88,8 +102,12 @@ def gravar(con, rid, r, dados, tipo, momento, estorno_de=None, motivo="", transf
 @bp.route("/api/reservas/<int:rid>/despesas", methods=["POST"])
 @exige("despesas.lancar")
 def lancar(rid):
+    corpo = request.get_json(silent=True)
+    por_item = isinstance(corpo, dict) and "item_id" in corpo
+    if not por_item:
+        exigir("catalogo.gerir")           # avulso (preço digitado) só o administrador: os demais perfis escolhem item do catálogo
     try:
-        dados = desp.validar_lancamento(request.get_json(silent=True))
+        dados = desp.validar_por_item(corpo) if por_item else desp.validar_lancamento(corpo)
     except desp.Recusa as e:
         raise _recusa(e)
     con, momento = obter_con(), agora()
@@ -101,6 +119,8 @@ def lancar(rid):
             if antigo:
                 return jsonify(_item_por_id(con, antigo["id"])), 200
         _conferir_pode_lancar(con, r, desp.conta(con, rid))
+        if por_item:
+            dados = _dados_do_item(con, dados)
         soma, linhas = desp.saldo(con, rid)
         if linhas >= MAX_LANCAMENTOS:
             raise ErroApi("Esta reserva já tem o máximo de %d lançamentos" % MAX_LANCAMENTOS, 409)

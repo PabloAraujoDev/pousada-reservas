@@ -16,7 +16,7 @@ from .db import obter_con, transacao
 from .erros import ErroApi
 from .historico import ator_atual, registrar
 from .permissoes import capacidades, exige, exigir, pode
-from .regras import OCUPADAS, UNIDADES, data_valida
+from .regras import OCUPADAS, UNIDADES, agora_local, data_valida
 
 bp = Blueprint("governanca", __name__)
 MAX_EVENTOS = 50
@@ -28,7 +28,7 @@ CAMPOS_REG = ("unidade", "situacao", "situacao_em", "situacao_por", "pronto_em",
 
 def agora():
     """Hora LOCAL do servidor (a da pousada). Os testes fixam config AGORA."""
-    return current_app.config.get("AGORA") or datetime.now().replace(microsecond=0)
+    return current_app.config.get("AGORA") or agora_local()
 
 
 def _quem():

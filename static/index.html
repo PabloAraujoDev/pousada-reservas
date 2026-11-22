@@ -24,6 +24,7 @@
     <button data-aba="camareiras" data-cap="camareiras.ver" data-menu="camareiras" class="oculto">Camareiras</button>
     <button data-aba="canceladas" data-cap="reservas.ver_canceladas" data-menu="canceladas" class="oculto">Canceladas</button>
     <button data-aba="historico" data-cap="historico.completo,historico.resumo" data-menu="historico" class="oculto">Histórico</button>
+    <button data-aba="despesas" data-cap="catalogo.gerir" data-menu="despesas" class="oculto">Despesas</button>
     <button data-aba="usuarios" data-cap="usuarios" data-menu="usuarios" class="oculto">Usuários</button>
     <button id="btnImpLista" data-cap="importar" data-menu="importar" class="oculto">Importar lista</button>
     <button class="novo oculto" id="btnNova" data-cap="reservas.criar" data-menu="nova">+ Nova reserva</button>
@@ -230,6 +231,28 @@
     <ul class="lista-perfis suave" id="listaPerfis"></ul>
   </section>
 
+  <section id="aba-despesas" class="aba" aria-label="Despesas">
+    <div class="barra">
+      <button type="button" class="primario" id="cgNovo">+ Novo item</button>
+      <label class="cg-inativos"><input type="checkbox" id="cgInativos"> Mostrar desativados</label>
+      <span class="suave">Itens de consumo que a recepção escolhe ao lançar. O valor vem daqui e fica congelado em cada lançamento.</span>
+    </div>
+    <p id="cgMsg" class="suave" role="status" aria-live="polite"></p>
+    <div class="tabela-wrap cg-wrap"><table id="cgTabela"><thead><tr><th>Categoria</th><th>Grupo</th><th>Descrição</th><th>Valor</th><th>Situação</th><th></th></tr></thead><tbody id="cgLista"></tbody></table></div>
+    <h3 class="sub-perfis">Relatório de consumo (com a hora exata)</h3>
+    <p class="suave">Para conferir câmeras se um hóspede contestar. Só o administrador vê a hora.</p>
+    <div class="barra">
+      <label>De <input type="date" id="cnIni"></label>
+      <label>Até <input type="date" id="cnFim"></label>
+      <button type="button" class="primario" id="cnGerar">Gerar</button>
+      <button type="button" id="cnImprimir">Imprimir</button>
+    </div>
+    <p id="cnMsg" class="suave" role="status" aria-live="polite"></p>
+    <div id="cnImpCab" class="cn-imp-cab"></div>
+    <div class="tabela-wrap"><table id="cnTabela" class="oculto"><thead><tr><th>Data e hora</th><th>Apto</th><th>Hóspede</th><th>Item</th><th>Qtd</th><th>Unitário</th><th>Total</th><th>Quem lançou</th><th>Obs.</th></tr></thead><tbody id="cnLista"></tbody></table></div>
+    <p id="cnTotal" class="cn-total"></p>
+  </section>
+
   <section id="aba-buscar" class="aba">
     <div class="barra"><input type="search" id="busca" placeholder="Nome, unidade, observação..." class="campo-busca" aria-label="Buscar"></div>
     <div id="resultados"></div>
@@ -386,6 +409,27 @@
   <div class="rc-ficha-ass" aria-hidden="true"><div class="rc-ass-linhas"><span>Assinatura do hóspede</span><span>Recepção</span></div></div>
 </dialog>
 
+<dialog id="dlgCat" class="od-dlg" aria-labelledby="cgTit">
+  <div class="od-dlg-cab">
+    <h2 id="cgTit" tabindex="-1">Item do catálogo</h2>
+    <button type="button" class="od-fechar" id="cgFechar" aria-label="Fechar">&times;</button>
+  </div>
+  <form id="cgForm" class="cg-form" novalidate autocomplete="off">
+    <label>Categoria <select id="cgCategoria"></select></label>
+    <label>Grupo (opcional) <input type="text" id="cgGrupo" maxlength="40" placeholder="Ex.: Cervejas Long Neck"></label>
+    <label>Descrição <input type="text" id="cgDescricao" maxlength="80"></label>
+    <label>Valor (R$) <input type="text" id="cgPreco" inputmode="decimal" placeholder="0,00"></label>
+    <p id="cgAviso" class="aviso erro oculto" role="alert"></p>
+    <p id="cgAvisoCartao" class="aviso-cartao oculto">Isto parece um número de cartão. O sistema não guarda números de cartão: apague os números.</p>
+    <div class="acoes">
+      <button type="submit" class="primario" id="cgSalvar">Salvar</button>
+      <button type="button" id="cgCancelar">Cancelar</button>
+    </div>
+  </form>
+  <h3 class="sub-perfis">Alterações deste item</h3>
+  <ul id="cgLog" class="lista-perfis suave"></ul>
+</dialog>
+
 <dialog id="dlgDesp" class="od-dlg ds-dlg" aria-labelledby="dsTit">
   <div class="od-dlg-cab">
     <h2 id="dsTit" tabindex="-1"></h2>
@@ -399,7 +443,10 @@
   </div>
   <p id="dsSituacao" class="ds-situacao"></p>
   <form id="dsForm" class="ds-form oculto" novalidate autocomplete="off">
-    <label>Categoria
+    <label class="ds-f-item">Item
+      <select id="dsItem"></select>
+    </label>
+    <label class="ds-avulso oculto">Categoria
       <select id="dsCat">
         <option value="restaurante">Restaurante</option>
         <option value="bar">Bar / frigobar</option>
@@ -407,16 +454,17 @@
         <option value="outros">Outros</option>
       </select>
     </label>
-    <label class="ds-f-desc">Descrição
+    <label class="ds-f-desc ds-avulso oculto">Descrição
       <input type="text" id="dsDesc" maxlength="80" autocomplete="off" placeholder="Ex.: Água 500ml">
     </label>
     <label>Qtd
       <input type="number" id="dsQtd" min="1" max="99" step="1" value="1" inputmode="numeric">
     </label>
-    <label>Valor unitário (R$)
+    <label class="ds-avulso oculto">Valor unitário (R$)
       <input type="text" id="dsValor" inputmode="decimal" autocomplete="off" placeholder="0,00">
     </label>
-    <p class="ds-f-total">Total: <strong id="dsTotalVivo">R$ 0,00</strong></p>
+    <p class="ds-f-total">Unitário: <strong id="dsUnitVivo">-</strong> | Total: <strong id="dsTotalVivo">R$ 0,00</strong></p>
+    <label class="ds-f-modo oculto" id="dsModoRot"><input type="checkbox" id="dsAvulso"> Lançamento avulso (valor digitado; só administrador)</label>
     <button type="submit" class="primario" id="dsLancar">Lançar</button>
   </form>
   <p id="dsAvisoCartao" class="aviso-cartao oculto">Isto parece um número de cartão. O sistema não guarda números de cartão: apague os números.</p>
@@ -564,6 +612,9 @@
 <script src="/static/despesas_logica.js"></script>
 <script src="/static/despesas_form.js"></script>
 <script src="/static/despesas.js"></script>
+<script src="/static/catalogo_logica.js"></script>
+<script src="/static/catalogo.js"></script>
+<script src="/static/consumo.js"></script>
 <script src="/static/resumo_logica.js"></script>
 <script src="/static/resumo_conta.js"></script>
 <script src="/static/resumo_itens.js"></script>

@@ -64,8 +64,7 @@ def test_leituras_por_perfil(app, rid, papel):
 @pytest.mark.parametrize("papel", PAPEIS)
 def test_escritas_por_perfil(app, rid, papel):
     c = cl(app, papel)
-    lancar = c.post("/api/reservas/%d/despesas" % rid, json={"categoria": "bar", "descricao": "Agua", "quantidade": 1,
-                                                             "valor_unit_centavos": 500})
+    lancar = c.post("/api/reservas/%d/despesas" % rid, json={"item_id": 1, "item_versao": 1, "quantidade": 1})
     assert (lancar.status_code == 201) == (papel in ("admin", "atendente", "recepcao"))
     nota = c.post("/api/reservas/%d/notas" % rid, json={"texto": "x nota"})
     assert (nota.status_code == 201) == (papel in ("admin", "atendente", "recepcao"))

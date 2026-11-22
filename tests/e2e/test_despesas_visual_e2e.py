@@ -3,11 +3,12 @@ from base_despesas import *  # noqa: F401,F403
 from base_despesas import (Tela, abrir_despesas, abrir_lista, botao_despesas, erros_graves, lancar_pela_tela, preencher)
 
 
-def semear(p, desc="Item de apoio", cat="bar", unit=900):
-    """Lança direto pela API da própria página (garante ao menos uma linha na conta aberta)."""
-    return p.evaluate("""([rid, d, c, u]) => api('POST', '/api/reservas/' + rid + '/despesas',
-        {categoria: c, descricao: d, quantidade: 1, valor_unit_centavos: u, chave: 'sem-' + Math.random().toString(16).slice(2)})
-        .then(r => r.status)""", [p.evaluate("() => reservas.filter(r => r.nome === 'Ana Silva')[0].id"), desc, cat, unit])
+def semear(p, desc="", cat="", unit=0):
+    """Lança direto pela API da própria página, por ITEM do catálogo (o primeiro: Água com gás, R$ 5,00): garante uma linha na conta aberta."""
+    return p.evaluate("""([rid]) => api('GET', '/api/catalogo').then(c => { const it = c.dados.itens[0];
+        return api('POST', '/api/reservas/' + rid + '/despesas',
+        {item_id: it.id, item_versao: it.versao, quantidade: 1, chave: 'sem-' + Math.random().toString(16).slice(2)}); })
+        .then(r => r.status)""", [p.evaluate("() => reservas.filter(r => r.nome === 'Ana Silva')[0].id")])
 
 
 def test_recepcao_lanca_mas_nao_estorna(navegador, servidor):
@@ -114,14 +115,15 @@ def test_tema_escuro(navegador, servidor):
 def test_atualizacao_de_8s_sem_perder_o_que_esta_sendo_digitado(navegador, servidor):
     a, b = Tela(navegador, "admin"), Tela(navegador, "atend")
     abrir_despesas(a.page, "ins", "Bruno")
+    a.page.check("#dsAvulso")
     a.page.fill("#dsDesc", "Texto em andamento")
     a.page.fill("#dsValor", "7,5")
     antes = a.page.locator("#dsLista tr").count()
-    assert b.page.evaluate("""() => api('POST', '/api/reservas/' + reservas.filter(r => r.nome === 'Bruno Lima')[0].id + '/despesas',
-        {categoria: 'outros', descricao: 'Lançado por outro', quantidade: 1, valor_unit_centavos: 1100, chave: 'chave-outro-001'}).then(r => r.status)""") == 201
+    assert b.page.evaluate("""() => api('GET', '/api/catalogo').then(c => api('POST', '/api/reservas/' + reservas.filter(r => r.nome === 'Bruno Lima')[0].id + '/despesas',
+        {item_id: c.dados.itens[0].id, item_versao: c.dados.itens[0].versao, quantidade: 1, chave: 'chave-outro-001'})).then(r => r.status)""") == 201
     a.page.wait_for_function("n => document.querySelectorAll('#dsLista tr').length > n", arg=antes, timeout=14000)
     assert a.page.input_value("#dsDesc") == "Texto em andamento" and a.page.input_value("#dsValor") == "7,5"
-    assert "Lançado por outro" in a.page.inner_text("#dsLista") and "R$ 11,00" in a.page.inner_text("#dsTotais")
+    assert "Água com gás" in a.page.inner_text("#dsLista") and "R$ 5,00" in a.page.inner_text("#dsTotais")
     assert erros_graves(a.erros) == [] and erros_graves(b.erros) == []
     a.fechar()
     b.fechar()

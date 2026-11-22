@@ -38,7 +38,7 @@ def test_matriz_das_rotas_de_despesas(app, papel):
     c = cli(app, papel, "u_" + papel)
     assert (c.get("/api/reservas/%d/despesas" % rid).status_code == 200) == (papel in VER)
     assert (c.get("/api/despesas/resumo").status_code == 200) == (papel in VER)
-    r = lancar(c, rid, chave="chave-novo-" + papel)
+    r = c.post("/api/reservas/%d/despesas" % rid, json={"item_id": 1, "item_versao": 1, "quantidade": 1, "chave": "chave-novo-" + papel})
     assert (r.status_code == 201) == (papel in LANCAR)
     if papel not in LANCAR:
         assert r.status_code == 403 and "permissão" in r.get_json()["erro"]

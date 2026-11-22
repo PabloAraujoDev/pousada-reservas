@@ -28,6 +28,7 @@ def abrir_despesas(p, cat, nome):
 
 
 def preencher(p, desc, qtd="1", valor="8,00", cat=None):
+    p.check("#dsAvulso")             # lançamento avulso (valor digitado): só o administrador; os demais escolhem o item do catálogo
     if cat:
         p.select_option("#dsCat", cat)
     p.fill("#dsDesc", desc)

@@ -47,7 +47,7 @@ def test_migracao_012_sobre_banco_da_versao_11_com_dados(tmp_path):
         assert con.execute("SELECT MAX(versao) FROM schema_version").fetchone()[0] >= 12
         assert con.execute("SELECT nome FROM reservas").fetchone()[0] == "Ana"
         con.execute("INSERT INTO despesa_lancamento (reserva_id,tipo,categoria,descricao,quantidade,valor_unit_centavos,"
-                    "total_centavos,apto,em) VALUES (1,'lancamento','bar','Agua',2,800,1600,'201','x')")
+                    "total_centavos,apto,em) VALUES (1,'lancamento','bar','Agua',2,800,1600,'201','2026-10-01 10:00:00')")
     finally:
         con.close()
 
@@ -55,7 +55,7 @@ def test_migracao_012_sobre_banco_da_versao_11_com_dados(tmp_path):
 def inserir(con, rid=1, tipo="lancamento", total=1600, estorno_de=None, motivo="", qtd=2, unit=800, chave=None):
     con.execute("INSERT INTO despesa_lancamento (reserva_id,tipo,categoria,descricao,quantidade,valor_unit_centavos,"
                 "total_centavos,apto,em,estorno_de,motivo,chave) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
-                (rid, tipo, "bar", "Agua", qtd, unit, total, "201", "x", estorno_de, motivo, chave))
+                (rid, tipo, "bar", "Agua", qtd, unit, total, "201", "2026-10-01 10:00:00", estorno_de, motivo, chave))
 
 
 def test_triggers_e_checks_do_banco(app):
@@ -95,7 +95,7 @@ def test_limite_de_200_lancamentos(app):
     barreira = threading.Barrier(2)
     # clientes de teste não são seguros entre threads; cada thread usa o seu
     from tests import conftest
-    clientes = [conftest.cliente_como(app, "atendente", "t%d" % n) for n in range(2)]
+    clientes = [conftest.cliente_como(app, "admin", "t%d" % n) for n in range(2)]
 
     def disparar(n):
         barreira.wait()
@@ -113,7 +113,7 @@ def test_limite_de_200_lancamentos(app):
 def test_duplo_clique_simultaneo_cria_um_so(app):
     from tests import conftest
     rid = nova_reserva(app)["id"]
-    clientes = [conftest.cliente_como(app, "atendente", "d%d" % n) for n in range(4)]
+    clientes = [conftest.cliente_como(app, "admin", "d%d" % n) for n in range(4)]
     barreira, saidas = threading.Barrier(4), []
 
     def vai(n):
@@ -131,7 +131,7 @@ def test_estorno_simultaneo_so_um_passa(app):
     from tests import conftest
     rid = nova_reserva(app)["id"]
     lid = lancar(cli(app, "admin"), rid).get_json()["id"]
-    clientes = [conftest.cliente_como(app, "atendente", "e%d" % n) for n in range(4)]
+    clientes = [conftest.cliente_como(app, "admin", "e%d" % n) for n in range(4)]
     barreira, saidas = threading.Barrier(4), []
 
     def vai(n):

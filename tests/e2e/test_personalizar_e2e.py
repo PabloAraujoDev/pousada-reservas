@@ -145,7 +145,7 @@ def test_ocultar_somem_na_hora_persistem_e_restaurar_traz_de_volta(admin):
     admin.foto("10_dialogo_personalizar")
     rotulos = p.locator("#prefMenus label").all_inner_texts()
     assert [r.strip() for r in rotulos] == ["Mapa da reserva", "Calendário", "Folha da semana", "Buscar", "Governança", "Camareiras", "Canceladas", "Histórico",
-                                            "Usuários", "Importar lista", "+ Nova reserva"]
+                                            "Despesas", "Usuários", "Importar lista", "+ Nova reserva"]
     admin.marcar("canceladas", False)
     admin.marcar("importar", False)
     admin.salvar()
