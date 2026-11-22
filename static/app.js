@@ -661,8 +661,8 @@ $("cImprimir").addEventListener("click", function(){ window.print(); });
 document.querySelector('nav button[data-aba="camareiras"]').addEventListener("click", iniciarCam);
 
 /* ---------- Importar lista (Excel) ---------- */
-var imp = {arquivo: null, previa: null, linhas: [], lote: null, gravado: false, sha256: ""};
-var ROTULO_ST = {ok: "Pronta", aviso: "Aviso", erro: "Erro", ignorada: "Ignorada"};
+var imp = {arquivo: null, previa: null, linhas: [], lote: null, gravado: false, sha256: "", canc: null};
+var ROTULO_ST = {ok: "Pronta", aviso: "Aviso", erro: "Erro", ignorada: "Ignorada", atualizacao: "Atualização"};
 var desfazerTimer = null;
 
 function impMsg(txt, tipo){ var e = $("impMsg"); e.className = "aviso " + (tipo || ""); e.textContent = txt; }
@@ -678,8 +678,9 @@ function impPrevia(abas){
     $("impPrevia").disabled = false;
     if (!r.ok){ impMsg(r.dados.erro || "Não foi possível ler o arquivo.", "erro"); return; }
     imp.previa = r.dados; imp.lote = null; imp.gravado = false; imp.sha256 = r.dados.sha256 || "";
+    imp.canc = r.dados.cancelamentos || null;
     imp.linhas = r.dados.linhas.map(function(l){
-      l.st = l.status; l.mt = l.motivo; l.incluir = (l.status === "ok" || l.status === "aviso"); l.editada = false; return l;
+      l.st = l.status; l.mt = l.motivo; l.incluir = (l.status === "ok" || l.status === "aviso" || l.status === "atualizacao") && icDepsOk(l, imp.canc); l.editada = false; return l;
     });
     var antes = r.dados.importado_antes;
     if (antes) impMsg("Atenção: este mesmo arquivo já foi importado em " + dataHora(antes.criado) + " por " + antes.usuario +
@@ -717,12 +718,12 @@ function reavaliar(l){
   if (m){ l.st = "erro"; l.mt = m; l.incluir = false; }
   else { l.st = (l.avisos && l.avisos.length) ? "aviso" : "ok"; l.mt = (l.avisos || []).join("; ") || "Corrigida: pronta para importar."; l.incluir = true; }
 }
-function classeSt(st){ return st === "ignorada" ? "ign" : st; }
+function classeSt(st){ return st === "ignorada" ? "ign" : (st === "atualizacao" ? "ok" : st); }
 function linhaImp(l, k){
   var editavel = l.status === "erro";
   var cls = classeSt(l.st);
   var h = '<tr data-k="' + k + '" class="imp-' + cls + '">';
-  h += '<td><input type="checkbox" class="impInc"' + (l.incluir ? " checked" : "") + (l.st === "erro" || l.st === "ignorada" ? " disabled" : "") + ' aria-label="Importar esta linha"></td>';
+  h += '<td><input type="checkbox" class="impInc"' + (l.incluir ? " checked" : "") + (l.st === "erro" || l.st === "ignorada" || !icDepsOk(l, imp.canc) ? " disabled" : "") + ' aria-label="' + (l.st === "atualizacao" ? "Atualizar a reserva de " : "Importar a reserva de ") + esc(l.hospede) + ', ' + esc(l.apto) + '"></td>';
   h += '<td><span class="sem ' + cls + '"></span> ' + esc(ROTULO_ST[l.st]) + '</td>';
   h += '<td>' + esc(nomeAba(l.aba)) + ' / ' + esc(l.linha) + '</td>';
   h += '<td><b>' + esc(l.hospede) + '</b>' + (l.grupo && l.grupo !== l.hospede ? '<br><span class="suave">Grupo: ' + esc(l.grupo) + '</span>' : '') +
@@ -739,22 +740,26 @@ function linhaImp(l, k){
     h += '<td>' + esc(l.apto) + '</td><td>' + esc(l.entrada ? br(l.entrada) : "") + '</td><td>' + esc(l.saida ? br(l.saida) : "") + '</td>';
   }
   h += '<td><span class="pilula ' + esc(l.pagamento) + '" title="' + esc(l.texto_pagamento) + '">' + esc(PAGAMENTOS[l.pagamento] || l.pagamento) + '</span></td>';
-  h += '<td>' + esc(l.mt) + '</td></tr>';
+  h += '<td>' + esc(l.mt) + (l.atualizacao ? icDifHtml(l.atualizacao.diferencas) : '') + (l.depende_de && !icDepsOk(l, imp.canc) ? '<div class="suave">Marque o cancelamento abaixo para incluir.</div>' : '') + '</td></tr>';
   return h;
 }
 function contarImp(){
-  var c = {ok: 0, aviso: 0, erro: 0, ignorada: 0, marcadas: 0};
-  imp.linhas.forEach(function(l){ c[l.st]++; if (l.incluir && (l.st === "ok" || l.st === "aviso")) c.marcadas++; });
+  var c = {ok: 0, aviso: 0, erro: 0, ignorada: 0, atualizacao: 0, marcadas: 0, atualizar: 0, cancelar: 0};
+  imp.linhas.forEach(function(l){
+    c[l.st]++;
+    if (l.incluir && icDepsOk(l, imp.canc)){ if (l.st === "ok" || l.st === "aviso") c.marcadas++; else if (l.st === "atualizacao") c.atualizar++; }
+  });
+  c.cancelar = Object.keys(icMarcadas(imp.canc)).length;
   return c;
 }
 function desenharContImp(){
   var c = contarImp(), esp = imp.previa ? imp.previa.pedidos.filter(function(p){ return !p.ja_importado; }).length : 0;
-  $("impConts").innerHTML = [["Prontas", c.ok, "ok"], ["Avisos", c.aviso, "aviso"], ["Erros", c.erro, "erro"], ["Ignoradas", c.ignorada, "ign"], ["Lista de espera", esp, ""]].map(function(x){
+  $("impConts").innerHTML = [["Prontas", c.ok, "ok"], ["Avisos", c.aviso, "aviso"], ["Atualizações", c.atualizacao, "ok"], ["Cancelamentos", imp.canc ? imp.canc.propostas.length : 0, "aviso"], ["Erros", c.erro, "erro"], ["Ignoradas", c.ignorada, "ign"], ["Lista de espera", esp, ""]].map(function(x){
     return '<span class="cont">' + (x[2] ? '<span class="sem ' + x[2] + '"></span> ' : '') + esc(x[0]) + '<b>' + esc(x[1]) + '</b></span>';
   }).join("");
   var chk = $("impEsperaSalvar");
-  $("impGravar").textContent = "Importar " + c.marcadas + " reserva" + (c.marcadas === 1 ? "" : "s");
-  $("impGravar").disabled = imp.gravado || (c.marcadas === 0 && !(chk && chk.checked && esp > 0));
+  $("impGravar").textContent = icRotuloBotao(c.marcadas, c.atualizar, c.cancelar);
+  $("impGravar").disabled = imp.gravado || (c.marcadas + c.atualizar + c.cancelar === 0 && !(chk && chk.checked && esp > 0));
 }
 function desenharImp(){
   if (!imp.previa) return;
@@ -775,6 +780,7 @@ function desenharImp(){
       }).join("") + '</div>';
   }
   $("impEspera").innerHTML = he;
+  $("impCanc").innerHTML = icHtml(imp.canc);
   var chk = $("impEsperaSalvar"); if (chk) chk.addEventListener("change", desenharContImp);
   desenharContImp();
 }
@@ -784,17 +790,13 @@ function substituirLinhaImp(k){
   desenharContImp();
 }
 function gravarImp(){
-  var linhas = imp.linhas.filter(function(l){ return l.incluir && (l.st === "ok" || l.st === "aviso"); }).map(function(l){
-    return {aba: l.aba, linha: l.linha, a: l.apto, nome: l.hospede, extras: l.extras.join("\n"), n: l.n, i: l.entrada, f: l.saida,
-      p: l.pagamento, o: l.texto_pagamento, grupo: l.grupo};
-  });
   var chk = $("impEsperaSalvar");
   var pedidos = (chk && chk.checked) ? imp.previa.pedidos.filter(function(p){ return !p.ja_importado; }) : [];
   $("impGravar").disabled = true; impMsg("Importando...", "");
-  api("POST", "/api/importar/confirmar", {arquivo: imp.arquivo ? imp.arquivo.name : "", linhas: linhas, pedidos: pedidos, sha256: imp.sha256 || ""}).then(function(r){
+  api("POST", "/api/importar/confirmar", icCorpo(imp.linhas, imp.canc, imp.arquivo ? imp.arquivo.name : "", pedidos, imp.sha256)).then(function(r){
     if (r.ok){
       imp.lote = r.dados.lote_id; imp.gravado = true;
-      impMsg(r.dados.criadas + " reserva(s) importada(s), " + r.dados.ignoradas + " ignorada(s) (já existiam), " + r.dados.pedidos_criados + " pedido(s) na lista de espera.", "ok");
+      impMsg(r.dados.criadas + " reserva(s) importada(s), " + r.dados.ignoradas + " ignorada(s) (já existiam), " + r.dados.atualizadas + " atualizada(s), " + r.dados.canceladas + " cancelada(s), " + r.dados.pedidos_criados + " pedido(s) na lista de espera.", "ok");
       $("impDesfazer").style.display = "inline-block"; resetarDesfazer();
       desenharContImp(); carregar();
     } else {
@@ -810,7 +812,8 @@ function desfazerImp(){
   if (!b.dataset.pronto){ b.dataset.pronto = "1"; b.textContent = "Clique de novo para confirmar"; b.classList.add("confirmar"); desfazerTimer = setTimeout(resetarDesfazer, 4000); return; }
   api("POST", "/api/importar/desfazer/" + imp.lote).then(function(r){
     if (r.ok){
-      impMsg(r.dados.removidas + " reserva(s) removida(s) desta importação.", "ok");
+      impMsg(r.dados.removidas + " reserva(s) removida(s) desta importação; " + r.dados.revertidas + " cancelamento(s)/atualização(ões) revertido(s)" +
+        (r.dados.nao_revertidas ? " e " + r.dados.nao_revertidas + " não revertido(s) (alterados depois da importação, ou já com check-in, conta ou pagamento)." : "."), "ok");
       b.style.display = "none"; imp.lote = null; imp.gravado = false; carregar();
       impPrevia(selecionadasImp());
     } else { impMsg(r.dados.erro || "Não foi possível desfazer.", "erro"); resetarDesfazer(); }
@@ -842,6 +845,12 @@ $("impPassadas").addEventListener("change", function(){ if (imp.previa) impPrevi
 $("impVerIgn").addEventListener("change", desenharImp);
 $("impGravar").addEventListener("click", gravarImp);
 $("impDesfazer").addEventListener("click", desfazerImp);
+$("impCanc").addEventListener("change", function(ev){
+  var t = ev.target; if (!t.classList.contains("impCancChk") || !imp.canc) return;
+  imp.canc.propostas.forEach(function(p){ if (String(p.id) === t.dataset.id) p.marcada = t.checked; });
+  imp.linhas.forEach(function(l){ if (l.depende_de) l.incluir = icDepsOk(l, imp.canc); });
+  desenharImp();
+});
 $("impTab").addEventListener("change", function(ev){
   var tr = ev.target.closest("tr[data-k]"); if (!tr) return;
   var k = +tr.dataset.k, l = imp.linhas[k], t = ev.target;

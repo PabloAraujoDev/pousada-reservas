@@ -118,6 +118,8 @@ dialog.larga{width:min(1180px,calc(100vw - 16px))}
 #impTab tr.imp-erro td:first-child{box-shadow:inset 4px 0 var(--conflito)}
 #impTab input[type=date],#impTab select{padding:3px 5px;font-size:.82rem;max-width:140px}
 .sub{font-family:var(--fonte-titulo);font-size:1rem;margin:14px 0 6px}
+.imp-dif{font-size:.8rem;margin-top:3px}
+#impCancTab td{vertical-align:top;font-size:.85rem}
 .espera-item{border:1px solid var(--borda);border-radius:8px;padding:5px 9px;margin-bottom:4px;font-size:.82rem}
 button.perigo.confirmar{background:var(--conflito);color:#fff}
 /* Camareiras */

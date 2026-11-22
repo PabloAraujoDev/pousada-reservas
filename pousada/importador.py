@@ -23,7 +23,8 @@ LIMITE_LINHAS = 5000             # segurança: lê no máximo isto por aba
 LIMITE_LINHAS_CONFIRMAR = 5000   # segurança: o máximo de reservas aceitas numa confirmação
 LIMITE_PEDIDOS_CONFIRMAR = 1000  # idem, para a lista de espera
 MAX_TEXTO_PEDIDO = 1000
-ESTADIA_LONGA = 45               # acima disso gera um aviso (provável erro de digitação)
+MAX_CELULA = 2000                # célula maior que isto é cortada (nenhuma reserva precisa; evita CPU gasta em texto gigante)
+ESTADIA_LONGA = 45              # acima disso gera um aviso (provável erro de digitação)
 
 
 class ErroLinha(Exception):
@@ -53,7 +54,12 @@ def texto_celula(v):
             return ""
         if v == int(v):
             return str(int(v))
-    return re.sub(r"[ \t\r\f\v]+", " ", str(v)).strip()
+    return re.sub(r"[ \t\r\f\v]+", " ", str(v)[:MAX_CELULA]).strip()
+
+
+def aba_curta(aba):
+    """Título de aba (vindo do cliente) para mensagens e motivos: só texto limpo, curto e sem número de cartão."""
+    return aba[:60] if isinstance(aba, str) and texto_limpo(aba) and not contem_numero_cartao(aba[:300]) else ""
 
 
 def chave_importacao(apto, entrada, saida, nome):
@@ -275,10 +281,23 @@ def interpretar_pessoas(texto, extras):
 _RE_TELEFONE = re.compile(r"\(?\d{2}\)?[\s.-]*9?\d{4}[\s.-]?\d{4}")
 
 
+def _dividir_em_hifens(texto):
+    """Divide em ' - ' / '--' / ' --- ' (hífens com espaço de um dos lados). Linear: o re.split equivalente era quadrático."""
+    partes, ini = [], 0
+    for m in re.finditer(r"-+", texto):
+        i, f = m.start(), m.end()
+        antes, depois = i > ini and texto[i - 1] == " ", f < len(texto) and texto[f] == " "
+        if antes or depois:
+            partes.append(texto[ini:i - 1 if antes else i])
+            ini = f + 1 if depois else f
+    partes.append(texto[ini:])
+    return partes
+
+
 def interpretar_pedido(texto, ano, mes_aba):
     """Linha livre 'NOME - 03 PESSOAS - 03 A 06/12 - telefone' -> dados do pedido (melhor esforço)."""
     texto = re.sub(r"\s+", " ", texto).strip()
-    partes = [p.strip() for p in re.split(r"\s+-+\s*|\s*-+\s+", texto) if p.strip()]
+    partes = [p.strip() for p in _dividir_em_hifens(texto) if p.strip()]
     nome = (partes[0] if partes else texto)[:120]
     mp = re.search(r"(\d{1,4})\s*PESS", sem_acento_maiusc(texto))
     entrada = saida = None
@@ -291,27 +310,12 @@ def interpretar_pedido(texto, ano, mes_aba):
             "saida": saida, "contato": mt.group(0).strip() if mt else "", "observacao": texto}
 
 
-# ---------------------------------------------------------------- prévia
+# ---------------------------------------------------------------- prévia (montada em importador_previa.py)
 
-def _sobrepoe(i1, f1, i2, f2):
-    return i1 < f2 and i2 < f1
-
-
-def _quase_igual(item, aceitas_apto, aba):
-    """Reserva de outra aba, mesmo apto e datas, com nome quase igual (erro de digitação)? Devolve-a ou None."""
-    for o in aceitas_apto:
-        if o["aba"] != aba and (o["entrada"], o["saida"]) == (item["entrada"], item["saida"]):
-            if difflib.SequenceMatcher(None, sem_acento_maiusc(o["hospede"]),
-                                       sem_acento_maiusc(item["hospede"])).ratio() >= 0.9:
-                return o
-    return None
-
-
-def _carregar_existentes(con):
-    por_apto = {}
-    for r in con.execute("SELECT id, a, nome, i, f, chave_import, status FROM reservas"):
-        por_apto.setdefault(r["a"], []).append(dict(r))
-    return por_apto
+def montar_previa(wb, con, hoje, titulos=None, incluir_passadas=False):
+    """Lê a planilha e devolve a prévia completa. NÃO grava nada no banco."""
+    from .importador_previa import montar_previa as montar     # import tardio: o módulo da prévia importa este
+    return montar(wb, con, hoje, titulos, incluir_passadas)
 
 
 def _interpretar_reserva(bruta, ano, mes_aba):
@@ -366,109 +370,8 @@ class _Ignorada(_Erro):
     pass
 
 
-def descrever_abas(abas, selecionadas):
-    return [{"titulo": a["titulo"], "mes": a["mes"], "ano": a["ano"],
-             "selecionada": a["titulo"] in selecionadas} for a in abas]
-
-
-def montar_previa(wb, con, hoje, titulos=None, incluir_passadas=False):
-    """Lê a planilha e devolve a prévia completa. NÃO grava nada no banco."""
-    abas = listar_abas(wb)
-    if titulos is None:
-        titulos = [a["titulo"] for a in abas if a["mes"] in MESES_PADRAO]
-    titulos = set(titulos)
-    existentes = _carregar_existentes(con)
-    pedidos_banco = {(sem_acento_maiusc(r["nome"]), sem_acento_maiusc(r["observacao"]))
-                     for r in con.execute("SELECT nome, observacao FROM pedidos")}
-    vistas, aceitas = {}, {}      # chave -> origem ; apto -> reservas válidas da planilha
-    linhas_out, pedidos_out, vistos_ped = [], [], set()
-    n_canc = cartoes_espera = 0
-    hoje_iso = hoje.isoformat()
-    for aba in abas:
-        if aba["titulo"] not in titulos:
-            continue
-        ano = aba["ano"] or hoje.year
-        aviso_ano = [] if aba["ano"] else ["Ano não encontrado na aba: assumido %d" % ano]
-        brutas, espera, canc = ler_grade(aba["linhas"])
-        n_canc += canc
-        for bruta in brutas:
-            saida_linha = {"aba": aba["titulo"], "id": len(linhas_out)}
-            try:
-                item = _interpretar_reserva(bruta, ano, aba["mes"])
-                item["avisos"].extend(aviso_ano)
-                status, categoria, motivo, conflitos = "ok", "", "", []
-                chave = chave_importacao(item["apto"], item["entrada"], item["saida"], item["hospede"])
-                if chave in vistas:
-                    o = vistas[chave]
-                    raise _Ignorada(item, "repetida", "Repetida na virada do mês (igual à linha %d da aba %s): fundida"
-                                    % (o[1], o[0]))
-                parecida = _quase_igual(item, aceitas.get(item["apto"], []), aba["titulo"])
-                if parecida:
-                    raise _Ignorada(item, "repetida", "Repetida na virada do mês (quase igual à linha %d da aba %s, "
-                                    "só o nome tem pequena diferença): fundida" % (parecida["linha"], parecida["aba"]))
-                vistas[chave] = (aba["titulo"], item["linha"])
-                if item["saida"] < hoje_iso and not incluir_passadas:
-                    raise _Ignorada(item, "encerrada", "Reserva já encerrada (saída antes de hoje)")
-                dup = [r for r in existentes.get(item["apto"], [])
-                       if r["chave_import"] == chave or (r["i"] == item["entrada"] and r["f"] == item["saida"]
-                                                         and sem_acento_maiusc(r["nome"]) == sem_acento_maiusc(item["hospede"]))]
-                if dup:
-                    raise _Ignorada(item, "ja_importada", "Já importada (existe no sistema)")
-                for r in existentes.get(item["apto"], []):
-                    if r["status"] == "ativa" and _sobrepoe(item["entrada"], item["saida"], r["i"], r["f"]):
-                        conflitos.append({"origem": "banco", "id": r["id"], "nome": r["nome"],
-                                          "entrada": r["i"], "saida": r["f"]})
-                for o in aceitas.get(item["apto"], []):
-                    if _sobrepoe(item["entrada"], item["saida"], o["entrada"], o["saida"]):
-                        conflitos.append({"origem": "planilha", "aba": o["aba"], "linha": o["linha"],
-                                          "nome": o["hospede"], "entrada": o["entrada"], "saida": o["saida"]})
-                if conflitos:
-                    item["conflitos"] = conflitos
-                    motivo = "Conflito: " + "; ".join(_descrever_conflito(c) for c in conflitos)
-                    if any(c["origem"] == "planilha" and c["aba"] != aba["titulo"] and
-                           (c["entrada"], c["saida"]) == (item["entrada"], item["saida"]) for c in conflitos):
-                        motivo += " - mesmas datas em outra aba: talvez seja a mesma reserva com o nome escrito diferente"
-                    raise _Erro(item, "conflito", motivo)
-                aceitas.setdefault(item["apto"], []).append(dict(item, aba=aba["titulo"]))
-                if item["avisos"]:
-                    status, motivo = "aviso", "; ".join(item["avisos"])
-                saida_linha.update(item, status=status, categoria=categoria, motivo=motivo)
-            except _Ignorada as e:
-                saida_linha.update(e.item, status="ignorada", categoria=e.categoria, motivo=e.motivo)
-            except _Erro as e:
-                saida_linha.update(e.item, status="erro", categoria=e.categoria, motivo=e.motivo)
-            saida_linha.setdefault("conflitos", [])
-            linhas_out.append(saida_linha)
-        for esp in espera:
-            if contem_numero_cartao(esp["texto"]):
-                cartoes_espera += 1          # item da lista de espera com cartão não entra na prévia
-                continue
-            p = interpretar_pedido(esp["texto"], ano, aba["mes"])
-            k = sem_acento_maiusc(p["observacao"])
-            if k in vistos_ped:
-                continue
-            vistos_ped.add(k)
-            p.update(aba=aba["titulo"], linha=esp["linha"],
-                     ja_importado=(sem_acento_maiusc(p["nome"]), k) in pedidos_banco)
-            pedidos_out.append(p)
-    cont = {"prontas": 0, "avisos": 0, "erros": 0, "ignoradas": 0}
-    for l in linhas_out:
-        cont[{"ok": "prontas", "aviso": "avisos", "erro": "erros", "ignorada": "ignoradas"}[l["status"]]] += 1
-    cont["lista_espera"] = len([p for p in pedidos_out if not p["ja_importado"]])
-    cont["cancelamentos"] = n_canc
-    cont["espera_com_cartao"] = cartoes_espera
-    return {"abas": descrever_abas(abas, titulos), "linhas": linhas_out, "pedidos": pedidos_out,
-            "contadores": cont, "hoje": hoje_iso}
-
-
 def _br(iso):
     return "%s/%s" % (iso[8:10], iso[5:7])
-
-
-def _descrever_conflito(c):
-    if c["origem"] == "banco":
-        return "reserva já cadastrada #%s de %s (%s a %s)" % (c["id"], c["nome"], _br(c["entrada"]), _br(c["saida"]))
-    return "linha %s da aba %s, %s (%s a %s)" % (c["linha"], c["aba"], c["nome"], _br(c["entrada"]), _br(c["saida"]))
 
 
 # ---------------------------------------------------------------- gravação
@@ -501,7 +404,7 @@ def _gravar_linhas(con, linhas, lote_id, ator):
     """Valida e grava cada linha. Devolve (criadas, ignoradas, problemas, houve_conflito)."""
     problemas, criadas, ignoradas, conflito = [], 0, [], False
     for k, bruto in enumerate(linhas):
-        ref = {"aba": str(bruto.get("aba", "")) if isinstance(bruto, dict) else "",
+        ref = {"aba": aba_curta(bruto.get("aba")) if isinstance(bruto, dict) else "",
                "linha": bruto.get("linha") if isinstance(bruto, dict) else None, "indice": k}
         dados, erro = validar_reserva(bruto)
         if erro:
@@ -524,22 +427,54 @@ def _gravar_linhas(con, linhas, lote_id, ator):
     return criadas, ignoradas, problemas, conflito
 
 
-def confirmar_importacao(con, arquivo, usuario, linhas, pedidos, ator=None, sha256=None):
-    """Grava as linhas aprovadas. REVALIDA tudo dentro de uma transação: tudo ou nada.
+def prevalidar(linhas, pedidos, cancelamentos, atualizacoes, sel):
+    """Conferência BARATA, sem gravar nada e sem tocar no banco (a rota a faz antes da cópia de segurança, para que
+    pedido inválido não gire as cópias): tipos, limites, linhas inválidas e selos das alterações. Levanta ImportacaoRecusada."""
+    from .importador_aplicar import LIMITE_ALTERACOES, conferir_selos
+    if not all(isinstance(x, list) for x in (linhas, pedidos, cancelamentos, atualizacoes)):
+        raise ImportacaoRecusada([{"motivo": "Dados inválidos"}], False)
+    if len(cancelamentos) > LIMITE_ALTERACOES or len(atualizacoes) > LIMITE_ALTERACOES:
+        raise ImportacaoRecusada([{"motivo": "Itens demais numa só importação (máximo %d cancelamentos e %d atualizações)"
+                                   % (LIMITE_ALTERACOES, LIMITE_ALTERACOES)}], False)
+    if len(linhas) > LIMITE_LINHAS_CONFIRMAR or len(pedidos) > LIMITE_PEDIDOS_CONFIRMAR:
+        raise ImportacaoRecusada([{"motivo": "Itens demais numa só importação (máximo %d reservas e %d pedidos)"
+                                   % (LIMITE_LINHAS_CONFIRMAR, LIMITE_PEDIDOS_CONFIRMAR)}], False)
+    if (cancelamentos or atualizacoes) and sel is None:
+        raise ImportacaoRecusada([{"motivo": "Não foi possível conferir a prévia"}], False)
+    problemas = conferir_selos(cancelamentos, atualizacoes, sel)
+    for k, bruto in enumerate(linhas):
+        erro = validar_reserva(bruto)[1]
+        if erro:
+            problemas.append({"aba": aba_curta(bruto.get("aba")) if isinstance(bruto, dict) else "",
+                              "linha": bruto.get("linha") if isinstance(bruto, dict) else None, "indice": k, "motivo": erro})
+    if problemas:
+        raise ImportacaoRecusada(problemas, False)
+
+
+def confirmar_importacao(con, arquivo, usuario, linhas, pedidos, ator=None, sha256=None,
+                         cancelamentos=(), atualizacoes=(), hoje=None, selagem=None):
+    """Grava o que o administrador aprovou. REVALIDA tudo dentro de uma transação: tudo ou nada.
+
+    Ordem: 1) cancelamentos (liberam unidades), 2) atualizações de reservas existentes, 3) reservas novas.
 
     Reservas idênticas às que já existem são ignoradas (não é erro).
     Conflito de datas, apto inexistente etc. recusam a importação inteira (ImportacaoRecusada).
     """
-    if not isinstance(linhas, list) or not isinstance(pedidos, list):
-        raise ImportacaoRecusada([{"motivo": "Dados inválidos"}], False)
-    if len(linhas) > LIMITE_LINHAS_CONFIRMAR or len(pedidos) > LIMITE_PEDIDOS_CONFIRMAR:
-        raise ImportacaoRecusada([{"motivo": "Itens demais numa só importação (máximo %d reservas e %d pedidos)"
-                                   % (LIMITE_LINHAS_CONFIRMAR, LIMITE_PEDIDOS_CONFIRMAR)}], False)
+    from .importador_aplicar import aplicar_atualizacoes, aplicar_cancelamentos
+    cancelamentos = [] if cancelamentos is None else cancelamentos
+    atualizacoes = [] if atualizacoes is None else atualizacoes
+    prevalidar(linhas, pedidos, cancelamentos, atualizacoes, selagem)
+    hoje_iso = (hoje or date.today()).isoformat()
+    ator = ator or {"id": None, "login": _texto_pedido(usuario, 80), "ip": ""}
     with transacao(con):
         lote_id = con.execute(
             "INSERT INTO importacoes (arquivo, criado, usuario, total, criadas, sha256) VALUES (?,?,?,?,0,?)",
             (_texto_pedido(arquivo, 200), agora(), (ator or {}).get("login") or _texto_pedido(usuario, 80),
              len(linhas), sha256)).lastrowid
+        for etapa, itens in ((aplicar_cancelamentos, cancelamentos), (aplicar_atualizacoes, atualizacoes)):
+            problemas = etapa(con, itens, lote_id, ator, hoje_iso, selagem)
+            if problemas:
+                raise ImportacaoRecusada(problemas, True)
         criadas, ignoradas, problemas, conflito = _gravar_linhas(con, linhas, lote_id, ator)
         if problemas:
             raise ImportacaoRecusada(problemas, conflito)
@@ -547,9 +482,10 @@ def confirmar_importacao(con, arquivo, usuario, linhas, pedidos, ator=None, sha2
         con.execute("UPDATE importacoes SET criadas=? WHERE id=?", (criadas, lote_id))
         registrar(con, "importar", "importacao", lote_id, None,
                   {"lote": lote_id, "criadas": criadas, "ignoradas": len(ignoradas), "pedidos": pedidos_criados,
-                   "sha256": sha256}, ator)
+                   "canceladas": len(cancelamentos), "atualizadas": len(atualizacoes), "sha256": sha256}, ator)
     return {"lote_id": lote_id, "criadas": criadas, "ignoradas": len(ignoradas),
-            "detalhes_ignoradas": ignoradas, "pedidos_criados": pedidos_criados}
+            "detalhes_ignoradas": ignoradas, "pedidos_criados": pedidos_criados,
+            "canceladas": len(cancelamentos), "atualizadas": len(atualizacoes)}
 
 
 def _texto_pedido(v, maximo):
@@ -582,14 +518,24 @@ def _gravar_pedidos(con, pedidos, lote_id):
 
 
 def desfazer_lote(con, lote_id, ator=None):
-    """Remove só as reservas (e pedidos ainda abertos) criados por esse lote. None se o lote não existe."""
+    """Remove só as reservas (e pedidos ainda abertos) criados por esse lote e reverte cancelamentos/atualizações
+    que ninguém alterou depois. None se o lote não existe."""
+    from .importador_aplicar import desfazer_alteracoes
     with transacao(con):
         if not con.execute("SELECT 1 FROM importacoes WHERE id=?", (lote_id,)).fetchone():
             return None
+        removidas = mantidas = 0
         for r in con.execute("SELECT * FROM reservas WHERE lote_id=?", (lote_id,)).fetchall():
+            if r["versao"] != 1 or r["checkin_em"] or r["conta_aberta_em"]:
+                mantidas += 1          # editada depois da importação ou já com hóspede na casa: fica
+                continue
             registrar(con, "desfazer", "reserva", r["id"], dict(resumo_reserva(r), lote=lote_id), None, ator)
-        removidas = con.execute("DELETE FROM reservas WHERE lote_id=?", (lote_id,)).rowcount
+            removidas += con.execute("DELETE FROM reservas WHERE id=?", (r["id"],)).rowcount
         pedidos = con.execute("DELETE FROM pedidos WHERE lote_id=? AND situacao='aberto'", (lote_id,)).rowcount
+        # só depois de remover as criadas (que liberam unidades): reativa as canceladas e restaura as atualizadas,
+        # exceto as que alguém mexeu depois da importação
+        revertidas, puladas = desfazer_alteracoes(con, lote_id, ator)
+        puladas += mantidas
         registrar(con, "desfazer", "importacao", lote_id, None,
-                  {"lote": lote_id, "removidas": removidas, "pedidos": pedidos}, ator)
-    return {"removidas": removidas, "pedidos_removidos": pedidos}
+                  {"lote": lote_id, "removidas": removidas, "pedidos": pedidos, "revertidas": revertidas, "puladas": puladas}, ator)
+    return {"removidas": removidas, "pedidos_removidos": pedidos, "revertidas": revertidas, "nao_revertidas": puladas}

@@ -59,7 +59,8 @@ def _conferir_xml(nome, conteudo):
     Barramos aqui, sem depender do defusedxml estar instalado. Também limita a quantidade de células e
     linhas de uma aba, pois milhões de células vazias gastariam minutos e gigabytes de memória no openpyxl.
     """
-    if b"<!doctype" in conteudo[:4096].lower() or b"<!entity" in conteudo.lower():
+    minusc = conteudo.lower()
+    if b"<!doctype" in minusc or b"<!entity" in minusc or conteudo[:2] in (b"\xff\xfe", b"\xfe\xff") or conteudo[:4] in (b"\xff\xfe\x00\x00", b"\x00\x00\xfe\xff"):      # DTD ou XML em UTF-16/32
         raise ErroPlanilha("O arquivo tem declarações XML não permitidas (arquivo suspeito)")
     if nome.startswith("xl/worksheets/"):
         if conteudo.count(b"<c ") + conteudo.count(b"<c>") > MAX_CELULAS_POR_PARTE or conteudo.count(b"<row") > MAX_LINHAS_POR_PARTE:

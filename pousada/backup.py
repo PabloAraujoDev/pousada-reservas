@@ -124,10 +124,21 @@ def fazer_backup(origem, pasta_destino, agora=None, manter=MANTER):
         raise ErroBackup("Não foi possível criar a pasta de backup %s: %s" % (pasta_destino, e))
     nome = nome_do_backup(agora)
     destino, k = os.path.join(pasta_destino, nome), 1
-    while os.path.exists(destino):                      # dois backups no mesmo segundo
-        k += 1
-        destino = os.path.join(pasta_destino, nome[:-3] + "_%d.db" % k)
-    copiar_com_verificacao(origem, destino)
+    while True:                                         # dois backups no mesmo segundo (até em threads): nome reservado de forma atômica
+        try:
+            os.close(os.open(destino, os.O_CREAT | os.O_EXCL | os.O_WRONLY))
+            break
+        except FileExistsError:
+            k += 1
+            destino = os.path.join(pasta_destino, nome[:-3] + "_%d.db" % k)
+        except OSError as e:
+            raise ErroBackup("Não foi possível criar a cópia em %s: %s" % (pasta_destino, e))
+    try:
+        copiar_com_verificacao(origem, destino)
+    except BaseException:
+        if os.path.exists(destino) and os.path.getsize(destino) == 0:
+            os.remove(destino)                          # não deixa a reserva de nome vazia
+        raise
     _rotacionar(pasta_destino, manter)
     return destino
 

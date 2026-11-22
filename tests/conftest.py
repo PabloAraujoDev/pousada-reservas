@@ -25,7 +25,29 @@ class ClienteTeste(FlaskClient):
     """Cliente que envia sozinho o token CSRF e o Content-Type JSON nos pedidos que alteram dados."""
     csrf = None
 
+    def selar_item(self, it, tipo):
+        """Item de cancelamento ('c') ou atualização ('u') com o selo que a prévia daria agora a ESTE usuário."""
+        from pousada.importador_aplicar import selagem_da_requisicao, selo_atualizacao, selo_cancelamento
+        with self.session_transaction() as sess:
+            uid = sess.get("uid")
+        sel = selagem_da_requisicao(self.application.config, uid)
+        it = dict(it, selo_em=it.get("selo_em", int(sel.agora)))
+        return dict(it, selo=(selo_cancelamento if tipo == "c" else selo_atualizacao)(sel, it))
+
+    def _selar(self, kw):
+        """Confirmação da importação montada à mão nos testes: põe o selo da prévia nos itens que não o têm
+        (a prévia real já o traz). Use sem_selo=True para testar o servidor recusando item sem selo."""
+        corpo = kw.get("json")
+        if not isinstance(corpo, dict):
+            return
+        for chave, tipo in (("cancelamentos", "c"), ("atualizacoes", "u")):
+            if isinstance(corpo.get(chave), list):
+                corpo[chave] = [self.selar_item(it, tipo) if isinstance(it, dict) and "selo" not in it else it for it in corpo[chave]]
+
     def open(self, *args, **kw):
+        sem_selo = kw.pop("sem_selo", False)
+        if not sem_selo and args and str(args[0]).endswith("/api/importar/confirmar"):
+            self._selar(kw)
         if str(kw.get("method", "GET")).upper() in MUTANTES:
             if self.csrf is not None and not kw.pop("sem_csrf", False):
                 kw["headers"] = {"X-CSRF-Token": self.csrf, **(kw.get("headers") or {})}

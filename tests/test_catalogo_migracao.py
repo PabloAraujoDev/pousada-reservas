@@ -37,7 +37,7 @@ def test_migra_15_para_16_sem_perder_nada(banco_v15, tmp_path):
     bk = str(tmp_path / "bk")
     iniciar_banco(banco_v15, REAL, pasta_backup=bk)
     con = conectar(banco_v15)
-    assert con.execute("SELECT MAX(versao) FROM schema_version").fetchone()[0] == 16 and os.listdir(bk)
+    assert con.execute("SELECT MAX(versao) FROM schema_version").fetchone()[0] == 17 and os.listdir(bk)
     assert [tuple(r) for r in con.execute("SELECT * FROM reservas ORDER BY id")] == reservas
     novas = [tuple(r) for r in con.execute("SELECT * FROM despesa_lancamento ORDER BY id")]
     assert [l[:-1] for l in novas] == linhas and all(l[-1] is None for l in novas)        # item_id NULL: lançamento antigo

@@ -14,7 +14,11 @@ _RE_INVISIVEIS = re.compile("[­​-‍⁠﻿]")
 # Número corrido de 13 a 19 dígitos (letras coladas antes/depois não atrapalham)
 _RE_CORRIDO = re.compile(r"(?<!\d)\d{13,19}(?!\d)", re.ASCII)
 # Cadeia de grupos de 4+ dígitos separados por UM espaço, hífen ou ponto (ex.: 4111 1111 1111 1111)
-_RE_CADEIA = re.compile(r"(?<!\d)\d{4,}(?:[ \-.]\d{4,})+(?!\d)", re.ASCII)
+_SEP = r"[ \-._,/•·]"          # espaço, hífen, ponto, sublinhado, vírgula, barra, bullet
+_RE_CADEIA = re.compile(r"(?<!\d)\d{4,}(?:" + _SEP + r"\d{4,})+(?!\d)", re.ASCII)
+# Dígitos soltos, um a um ("4 1 1 1 ..."): 13 a 19 dígitos com o MESMO separador
+_RE_SOLTOS = re.compile(r"(?<!\d)\d(?:" + _SEP + r"\d){12,18}(?!\d)", re.ASCII)
+_HIFENS = dict.fromkeys(list(range(0x2010, 0x2016)) + [0x2212, 0xFE58, 0xFE63, 0xFF0D], "-")
 # Padrão visual 4-4-4-x: recusado mesmo que falhe no Luhn (provável erro de digitação de um cartão)
 _RE_VISUAL = re.compile(r"(?<!\d)\d{4}([ \-.])\d{4}\1\d{4}\1\d{1,7}(?!\d)", re.ASCII)
 
@@ -22,7 +26,7 @@ _RE_VISUAL = re.compile(r"(?<!\d)\d{4}([ \-.])\d{4}\1\d{4}\1\d{1,7}(?!\d)", re.A
 def _nao_ascii(trecho):
     """Só os caracteres fora do ASCII passam por aqui (texto em português quase não tem): sem formatação/marcas, NFKC, dígitos em ASCII."""
     t = "".join(c for c in trecho if unicodedata.category(c) not in ("Cf", "Mn", "Me") and c not in "ᅟᅠㅤﾠ")
-    t = unicodedata.normalize("NFKC", t)
+    t = unicodedata.normalize("NFKC", t).translate(_HIFENS)      # hífens "bonitos" (U+2010-2015, sinal de menos) viram "-"
     return "".join(str(unicodedata.decimal(c)) if c.isdigit() and unicodedata.decimal(c, None) is not None else c for c in t)
 
 
@@ -32,7 +36,7 @@ def _normalizar(texto):
     t = _RE_INVISIVEIS.sub("", texto)
     if not t.isascii():
         t = re.sub(r"[^\x00-\x7f]+", lambda m: _nao_ascii(m.group()), t)
-    return re.sub(r"\s+", " ", re.sub(r"\s*([-.])\s*", r"\1", t))
+    return re.sub(r" ?([-.•·]) ?", r"\1", re.sub(r"\s+", " ", t))      # espaços colapsados ANTES: tempo linear
 
 
 def _luhn(digitos):
@@ -48,7 +52,7 @@ def _luhn(digitos):
 
 def _cadeia_suspeita(cadeia):
     """Grupos com o MESMO separador, total de 13 a 19 dígitos e Luhn válido (telefones juntos têm separadores mistos)."""
-    separadores = set(re.findall(r"[ \-.]", cadeia))
+    separadores = set(re.findall(_SEP, cadeia))
     digitos = re.sub(r"\D", "", cadeia)
     return len(separadores) == 1 and 13 <= len(digitos) <= 19 and _luhn(digitos)
 
@@ -66,4 +70,4 @@ def contem_numero_cartao(texto):
         return True
     if any(_luhn(m) for m in _RE_CORRIDO.findall(t)):
         return True
-    return any(_cadeia_suspeita(m) for m in _RE_CADEIA.findall(t))
+    return any(_cadeia_suspeita(m) for m in _RE_CADEIA.findall(t) + _RE_SOLTOS.findall(t))

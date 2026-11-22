@@ -4,13 +4,14 @@ import json
 import re
 import sqlite3
 
-from flask import Blueprint, current_app, jsonify, request
+from flask import Blueprint, current_app, g, jsonify, request
 
-from .backup import ErroBackup, fazer_backup
+from .backup import ErroBackup, backup_recente, fazer_backup
 from .db import obter_con, transacao
 from .erros import ErroApi
 from .historico import ator_atual, registrar, resumo_reserva
-from .importador import ImportacaoRecusada, confirmar_importacao, desfazer_lote, montar_previa
+from .importador import ImportacaoRecusada, confirmar_importacao, desfazer_lote, montar_previa, prevalidar
+from .importador_aplicar import selagem_da_requisicao, selar_previa
 from .permissoes import exige
 from .regras import MSG_CARTAO, existe_conflito, validar_reserva
 from .rotas import SQL_INSERIR, hoje, valores_inserir
@@ -22,9 +23,17 @@ LIMITE_ARQUIVO = 5 * 1024 * 1024   # 5 MB
 _RE_SHA256 = re.compile(r"^[0-9a-f]{64}$")
 
 
-def backup_antes_de_importar():
+def _selagem():
+    """Selo da prévia: amarrado ao usuário logado e com validade."""
+    u = g.get("usuario")
+    return selagem_da_requisicao(current_app.config, u["id"] if u else None)
+
+
+def backup_antes_de_importar(limitar=False):
     """Importar mexe em muitos registros de uma vez: antes, guarda uma cópia. Se a cópia falhar, não importa."""
     try:
+        if limitar and backup_recente(current_app.config["PASTA_BACKUP"]):
+            return          # já há uma cópia de segundos atrás: repetir pedidos não gira as cópias boas para fora
         fazer_backup(current_app.config["CAMINHO_BANCO"], current_app.config["PASTA_BACKUP"])
     except ErroBackup as e:
         raise ErroApi("Não foi possível fazer a cópia de segurança antes de importar, então nada foi importado. %s" % e, 503)
@@ -104,6 +113,7 @@ def importar_previa():
     incluir = request.form.get("incluir_passadas", "") in ("1", "true", "sim")
     con = obter_con()
     previa = montar_previa(wb, con, hoje(), titulos, incluir)
+    selar_previa(previa, _selagem())
     previa["sha256"] = sha256
     previa["importado_antes"] = _importacao_anterior(con, sha256)
     return jsonify(previa)
@@ -116,15 +126,21 @@ def importar_confirmar():
     corpo = request.get_json(silent=True)
     if not isinstance(corpo, dict):
         raise ErroApi("Dados inválidos", 400)
-    if corpo.get("linhas") or corpo.get("pedidos"):     # sem nada a gravar não há o que proteger (e não gira as cópias)
-        backup_antes_de_importar()
+    selagem = _selagem()
+    try:       # pedido inválido é recusado ANTES da cópia de segurança (senão dá para empurrar as cópias boas para fora)
+        prevalidar(*(corpo.get(c) if corpo.get(c) is not None else [] for c in ("linhas", "pedidos", "cancelamentos", "atualizacoes")), selagem)
+    except ImportacaoRecusada as e:
+        raise ErroApi("Importação recusada: nada foi gravado. Corrija os itens indicados.", 400, problemas=e.problemas)
+    if corpo.get("linhas") or corpo.get("pedidos") or corpo.get("cancelamentos") or corpo.get("atualizacoes"):     # sem nada a gravar não há o que proteger (e não gira as cópias)
+        backup_antes_de_importar(limitar=True)
     sha256 = corpo.get("sha256")
     sha256 = sha256 if isinstance(sha256, str) and _RE_SHA256.match(sha256) else None
     con = obter_con()
     repetido = _importacao_anterior(con, sha256) if sha256 else None
     try:
         r = confirmar_importacao(con, corpo.get("arquivo"), corpo.get("usuario"),
-                                 corpo.get("linhas", []), corpo.get("pedidos", []), ator=ator_atual(), sha256=sha256)
+                                 corpo.get("linhas", []), corpo.get("pedidos", []), ator=ator_atual(), sha256=sha256,
+                                 cancelamentos=corpo.get("cancelamentos"), atualizacoes=corpo.get("atualizacoes"), hoje=hoje(), selagem=selagem)
     except ImportacaoRecusada as e:
         raise ErroApi("Importação recusada: nada foi gravado. Corrija os itens indicados.",
                       409 if e.conflito else 400, problemas=e.problemas)

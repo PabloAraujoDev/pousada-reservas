@@ -15,7 +15,7 @@ CAMPOS_AUDITADOS = ("a", "i", "f", "n", "p")
 CHAVES_PERMITIDAS = frozenset(CAMPOS_AUDITADOS) | {
     "nome", "status", "lote", "criadas", "ignoradas", "removidas", "sha256", "motivo", "arquivo",
     "papel", "ativo", "pedidos", "tipo", "diaria", "unidade", "situacao",
-    "categoria", "itens", "estado", "placa", "forma"}       # despesas: só a categoria e a contagem, NUNCA valor nem descrição
+    "canceladas", "atualizadas", "revertidas", "puladas", "categoria", "itens", "estado", "placa", "forma"}       # despesas: só a categoria e a contagem, NUNCA valor nem descrição
 
 
 def ator_atual(login_digitado=None):
